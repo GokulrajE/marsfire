@@ -1,9 +1,22 @@
+/* variables.h
+ *  Header file that contains all the variable declarations for the 
+ *  MARS CONTROL program.
+ *  
+ *  Sivakumar Balasubramanian.
+ */
+
 #include "Arduino.h"
 #include "CustomDS.h"
 #include "SerialReader.h"
 #include "SoftwareSerial.h"
 #include "HX711_ADC.h"
 #include <Bounce2.h>
+
+
+
+
+
+
 float time_ellapsed = 0;
 
 

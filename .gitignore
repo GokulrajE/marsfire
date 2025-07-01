@@ -69,3 +69,6 @@ manifest.mf
 nbbuild.xml
 nbproject
 temp/
+
+# My ignores
+private/*

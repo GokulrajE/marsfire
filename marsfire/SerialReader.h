@@ -1,10 +1,4 @@
- /* SerailReader.h defines the class for handling reading, parsing
- * and handling of serial data.
- * 
- * Author: Sivakumar Balasubramanian
- * Created on: August 01 2017
- */
- 
+
 #ifndef SerialReader_h
 #define SerialReader_h
 
@@ -17,6 +11,7 @@ enum ReaderState {
   PAYLOAD,
   CHKSUM,
   WAITFORHANDLING
+ 
 };
 
 class SerialReader {
@@ -28,12 +23,15 @@ class SerialReader {
     int readUpdate();
     void payloadHandled();
   private:
-    // Serial communciation related dataa
+ 
+ // Serial communciation related dataa
     byte _currByte;
     unsigned int _currPlSz;
     unsigned int _plCntr;
     byte _chksum;
     ReaderState _state;
 };
+
+
 
 #endif

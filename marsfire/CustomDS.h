@@ -3,10 +3,21 @@
 #include "Arduino.h"
 
 
+
 typedef union {
   float num;
   uint8_t bytes[4];
 } floatunion_t;
+
+typedef union {
+  uint16_t num;
+  uint8_t bytes[4];
+} uint16union_t;
+
+typedef union {
+  unsigned long num;
+  uint8_t bytes[4];
+} ulongunion_t;
 
 // I2C Value.
 typedef union {

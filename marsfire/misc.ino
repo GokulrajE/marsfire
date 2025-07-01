@@ -1,9 +1,110 @@
+
+/*
+ * Check if there is heartbeat.
+ */
+void checkHeartbeat() {
+  // Check if a heartbeat was recently received.
+  if (0.001 * (millis() - lastRxdHeartbeat) < MAX_HBEAT_INTERVAL) {
+    // Everything is good. No heart beat related error.
+    deviceError.num &= ~NOHEARTBEAT;
+  } else {
+    // No heartbeat received.
+    // Setting error flag.
+    deviceError.num |= NOHEARTBEAT;
+  }
+}
+
+/*
+ * Handles errors
+ */
+void handleErrors() {
+  if (deviceError.num != 0) {
+    // #if SERIALUSB_DEBUG
+    //   SerialUSB.print("Error occured: ");
+    //   SerialUSB.print(deviceError.num);
+    //   SerialUSB.print("\n");
+    // #endif
+    setControlType(NONE);
+  }
+}
+
 void _assignFloatUnionBytes(int inx, byte* bytes, floatunion_t* temp) {
   temp->bytes[0] = bytes[inx];
   temp->bytes[1] = bytes[inx + 1];
   temp->bytes[2] = bytes[inx + 2];
   temp->bytes[3] = bytes[inx + 3];
 }
+
+// Initial hardware set up the device.
+void deviceSetUp()
+{
+  // 1. Calibration Button
+  calibBounce.attach(CALIB_BUTTON);
+  calibBounce.interval(5);
+  
+  // 2. Set up all encoders.
+  pinMode(ENC1A, INPUT_PULLUP);
+  pinMode(ENC1B, INPUT_PULLUP);
+  pinMode(ENC2A, INPUT_PULLUP);
+  pinMode(ENC2B, INPUT_PULLUP);
+  pinMode(ENC3A, INPUT_PULLUP);
+  pinMode(ENC3B, INPUT_PULLUP);
+  pinMode(ENC4A, INPUT_PULLUP);
+  pinMode(ENC4B, INPUT_PULLUP);
+
+  // 3. Set up the two loadcells
+  scale1.begin();
+  scale1.start(1, true);
+  scale1.setCalFactor(LOACELL_CALIB_FACTOR);
+  scale2.begin();
+  scale2.start(1, true);
+  scale2.setCalFactor(LOACELL_CALIB_FACTOR);
+
+  // 4. Motor setup
+  pinMode(MOTOR_ENABLE, OUTPUT);
+  pinMode(MOTOR_DIR, OUTPUT);
+  pinMode(MOTOR_PWM,OUTPUT);
+
+  // 5. IMU setup
+  imuSetup();
+
+  // 6. MARS button
+  marsBounce.attach(MARS_BUTTON);
+  marsBounce.interval(5);
+}
+
+/*
+ * Read and update all sensor data.
+ */
+void updateSensorData()
+{
+  // 1. Read the force sensors.
+  scale1.update();
+  force1 = -scale1.getData();
+  scale2.update();
+  force2 = scale2.getData();
+
+  // 2. Read the encoder data.
+  theta1Enc = read_angle_motor1();
+  theta2Enc = read_angle_motor2();
+  theta3Enc = read_angle_motor3();
+  theta4Enc = read_angle_motor4();
+  
+  theta1 = theta1Enc + offset1;
+  theta2 = theta2Enc + offset2;
+  theta3 = theta3Enc + offset3;
+  theta4 = theta4Enc + offset4;
+
+  // 3. Read buttons.
+  marsBounce.update();
+  marsButton = marsBounce.read();
+  calibBounce.update();
+  calibButton = calibBounce.read();
+
+  // 4. Read IMU data.
+  updateImu();
+}
+
 
 void setSupport (int sz, int strtInx, byte* payload)
 {
@@ -23,66 +124,46 @@ void setSupport (int sz, int strtInx, byte* payload)
   inx += 4; 
 }
 
-void encoderSetup()
-{
-  pinMode(ENC1A, INPUT_PULLUP);
-  pinMode(ENC1B, INPUT_PULLUP);
-  pinMode(ENC2A, INPUT_PULLUP);
-  pinMode(ENC2B, INPUT_PULLUP);
-  pinMode(ENC3A, INPUT_PULLUP);
-  pinMode(ENC3B, INPUT_PULLUP);
-  pinMode(ENC4A, INPUT_PULLUP);
-  pinMode(ENC4B, INPUT_PULLUP);
+
+byte getProgramStatus(byte dtype) {
+  // X | DATA TYPE | DATA TYPE | DATA TYPE | CONTROL TYPE | CONTROL TYPE | CONTROL TYPE | CALIB
+  return ((dtype << 4) | (ctrlType << 1) | (calib & 0x01));
 }
 
-void loadCellSetup()
-{
-  scale1.begin();
-  scale1.start(1, true);
-  scale1.setCalFactor(calibration_factor);
+
+byte getLimbType(void) {
+  // X | X | X | X | X | X | CURR LIMB | CURR LIMB
+  return currLimb;
+}
+
+// void readMarsButtonState(void) {
+//    button.update();                  // Update the Bounce instance
+//    marsButton = button.read();
+// }
+
+// void updateEncoders()
+// {
+//   theta1Enc = read_angle_motor1();
+//   theta2Enc = read_angle_motor2();
+//   theta3Enc = read_angle_motor3();
+//   theta4Enc = read_angle_motor4();
   
-  scale2.begin();
-  scale2.start(1, true);
-  scale2.setCalFactor(calibration_factor);
-}
-
-void motorDataSetup()
-{
-  // motor setup
-  pinMode(enablepin_theta1,OUTPUT);
-  pinMode(directionpin_theta1,OUTPUT);
-  pinMode(PWMpin_theta1,OUTPUT);
-
-}
-void readMarsButtonState(void) {
-   button.update();                  // Update the Bounce instance
-   marsButton = button.read();
-  //  Serial.println(marsButton);
-}
-
-void updateEncoders()
-{
-  theta1Enc = read_angle_motor1();
-  theta2Enc = read_angle_motor2();
-  theta3Enc = read_angle_motor3();
-  theta4Enc = read_angle_motor4();
-  
-  theta1 = theta1Enc + offset1;
-  theta2 = theta2Enc + offset2;
-  theta3 = theta3Enc + offset3;
-  theta4 = theta4Enc + offset4;
+//   theta1 = theta1Enc + offset1;
+//   theta2 = theta2Enc + offset2;
+//   theta3 = theta3Enc + offset3;
+//   theta4 = theta4Enc + offset4;
  
-}
+// }
 
-void updateLoadCells()
-{
-  scale1.update();
-  force1 = -scale1.getData();
+// void updateLoadCells()
+// {
+//   scale1.update();
+//   force1 = -scale1.getData();
 
-  scale2.update();
-  force2 = scale2.getData();
+//   scale2.update();
+//   force2 = scale2.getData();
 
-}
+// }
 
 float read_angle_motor1()
 {
@@ -131,31 +212,24 @@ float read_angle_motor4()
 void imuSetup()
 {
   Wire.begin();
-
-  
   mpu.setAddress(0x68);
   byte status = mpu.begin();
-
   Wire1.begin();
-
   mpu2.setAddress(0x68);
   mpu2.begin();
-  
   mpu3.setAddress(0x69);
   mpu3.begin();
 
   while(status!=0){ } // stop everything if could not connect to MPU6050
-
   delay(1000);
 
-  mpu.calcOffsets(true,false); // gyro and accelero
-  mpu2.calcOffsets(true,false);
-  mpu3.calcOffsets(true,false);
+  mpu.calcOffsets(true, false); // gyro and accelero
+  mpu2.calcOffsets(true, false);
+  mpu3.calcOffsets(true, false);
 }
 
 void updateImu()
 {
-
   mpu.update();
   mpu2.update();
   mpu3.update();
@@ -180,16 +254,15 @@ void updateImu()
    IMUtheta2 = -180/3.14*atan2(az1, -ay1);
    IMUtheta3 = 180/3.14*(-atan2(az2, -ay2)) - IMUtheta2;
    IMUtheta4 = 180/3.14*atan2(-ax3, ay3) - IMUtheta2 - IMUtheta3;
-   
 }
 
-void calibButtonSetup()
-{
-  pinMode(calib_button_pin, INPUT_PULLUP);
-}
+// void calibButtonSetup()
+// {
+//   pinMode(CALIB_BUTTON, INPUT_PULLUP);
+// }
 
 void updateCalibButton()
 {
-  calibButtonState = 1.0*digitalRead(calib_button_pin);
+  calibButtonState = 1.0 * digitalRead(CALIB_BUTTON);
   // Serial.println(digitalRead(calib_button_pin));
 }

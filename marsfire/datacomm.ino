@@ -7,96 +7,106 @@
 
 void writeSensorStream()
 {
-  byte header[] = {0xFF, 0xFF, 0x00};
+  // Format:
+  // 255 | 255 | No. of bytes | Status | Error Val 1 | Error Val 2 | ...
+  // Payload | Chksum
+  byte header[] = {0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00 };
   byte chksum = 0xFE;
   byte _temp;
 
 
   //Out data buffer
   outPayload.newPacket();
-
   outPayload.add(theta1);
   outPayload.add(theta2);
   outPayload.add(theta3);
   outPayload.add(theta4);
   outPayload.add(force1);
-  outPayload.add(calibButtonState);
-  outPayload.add(des1);
-  outPayload.add(des2);
-  outPayload.add(des3);
-  outPayload.add(PCParam);
-  outPayload.add(shx);
-  outPayload.add(shy);
-  outPayload.add(shz);
-  outPayload.add(upperArm);
-  outPayload.add(foreArm);
-  outPayload.add(W1);
-  outPayload.add(W2);
-  outPayload.add(IMUtheta1);
-  outPayload.add(IMUtheta2);
-  outPayload.add(IMUtheta3);
-  outPayload.add(IMUtheta4);
-  //if need to send imu RawData
-  // outPayload.add(ax1);
-  // outPayload.add(ay1);
-  // outPayload.add(az1);
-  // outPayload.add(ax2);
-  // outPayload.add(ay2);
-  // outPayload.add(az2);
-  // outPayload.add(ax3);
-  // outPayload.add(ay3);
-  // outPayload.add(az3);
 
-//  outPayload.add(elby);
-//  outPayload.add(elbz);
-//  outPayload.add(shx);
-//  outPayload.add(shy);
-//  outPayload.add(shz);
-//  outPayload.add(endx);
-//  outPayload.add(endy);
-//  outPayload.add(endz);
-//  outPayload.add(upperArm);
-//  outPayload.add(foreArm);
-//  outPayload.add(W1);
-//  outPayload.add(W2);
-
-  //  send packet
-  header[2] = outPayload.sz() * 4 + 1+1;
-  chksum += header[2];
+  // Send packet.
+  header[2] = (4                      // Four headers
+               + 2                    // Packet number int16
+               + 4                    // Run time
+               + outPayload.sz() * 4  // Float sensor data
+               + 2                    // Limb lengths
+               + 2                    // Limb weights
+               + 2                    // Shoulder position
+               + 4                    // IMU angles
+               + 1                    // MARS button data
+               + 1                    // CALIB button data
+               + 1                    // Checksum
+  header[3] = getProgramStatus(streamType);
+  header[4] = deviceError.bytes[0];
+  header[5] = deviceError.bytes[1];
+  header[6] = getLimbType();
+  chksum += header[2] + header[3] + header[4] + header[5] + header[6];
 
   //Send header
-//  Serial1.write(header[0]);
-//  Serial1.write(header[1]);
-//  Serial1.write(header[2]);
-//  Serial1.write(header[3]);
-  //
-    bt.write(header[0]);
-    bt.write(header[1]);
-    bt.write(header[2]);
+  bt.write(header[0]);
+  bt.write(header[1]);
+  bt.write(header[2]);
+  bt.write(header[3]);
+  bt.write(header[4]);
+  bt.write(header[5]);
+  bt.write(header[6]);
+  
+  // Send packet number
+  for (int i = 0; i < 2; i++) {
+    bt.write(packetNumber.bytes[i]);
+    chksum += packetNumber.bytes[i];
+  }
 
-  //
-    //Serial.println(header[0]);
-    //Serial.println(header[1]);
-   //Serial.println(header[2]);
+  // Send current run time
+  for (int i = 0; i < 4; i++) {
+    bt.write(runTime.bytes[i]);
+    chksum += runTime.bytes[i];
+  }
 
-
-  // Send payload
+  // Send the floats
   for (int i = 0; i < outPayload.sz() * 4; i++) {
     _temp = outPayload.getByte(i);
-//    Serial1.write(_temp);
-        bt.write(_temp);
+    bt.write(_temp);
     chksum += _temp;
   }
-  //Send checksum
-//  Serial1.write(chksum);
-     bt.write(marsButton);
-     chksum += marsButton;
 
-    bt.write(chksum);
-    bt.flush();
-    //serial.println(chksum);
+  // Send the human limb parameters
+  bt.write(uaLByte);
+  chksum += uaLByte;
+  bt.write(faLByte);
+  chksum += faLByte;
+  bt.write(uaWByte);
+  chksum += uaWByte;
+  bt.write(faWByte);
+  chksum += faWByte;
+  bt.write(shXByte);
+  chksum += shXByte;
+  bt.write(shYByte);
+  chksum += shYByte;
+  bt.write(shZByte);
+  chksum += shZByte;
 
+  // Send the IMU angles
+  bt.write(imu1Byte);
+  chksum ++ imu1byte;
+  bt.write(imu2Byte);
+  chksum ++ imu2byte;
+  bt.write(imu3Byte);
+  chksum ++ imu3byte;
+  bt.write(imu4Byte);
+  chksum ++ imu4byte;
+
+  // MARS Button state
+  bt.write(marsButton);
+  chksum += marsButton;
+
+  // CALIB Button state
+  bt.write(calibButton);
+  chksum += calibButton;
+
+  bt.write(chksum);
+  bt.flush();
 }
+
 
 void readHandleIncomingMessage() {
     int plSz = serReader.readUpdate();

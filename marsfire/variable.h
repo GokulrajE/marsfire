@@ -98,10 +98,10 @@
 #define MAX_UA_LENGTH         400     // millimeters
 #define MIN_FA_LENGTH         200     // millimeters
 #define MAX_FA_LENGTH         500     // millimeters
-#define MIN_UA_WEIGTH         1.0     // Kg
-#define MAX_UA_WEIGTH         5.0     // Kg
-#define MIN_FA_WEIGTH         1.0     // Kg
-#define MAX_FA_WEIGTH         5.0     // Kg
+#define MIN_UA_WEIGHT         1.0     // Kg
+#define MAX_UA_WEIGHT         5.0     // Kg
+#define MIN_FA_WEIGHT         1.0     // Kg
+#define MAX_FA_WEIGHT         5.0     // Kg
 #define MIN_SHLDR_X_POS       -150    // millimeters
 #define MAX_SHLDR_X_POS       +150    // millimeters
 #define MIN_SHLDR_Y_POS       -150    // millimeters
@@ -160,10 +160,10 @@ int8_t imu1Byte, imu2Byte, imu3Byte, imu4Byte;
 // Human limb parameters and their codes.
 float uaLength, faLength;
 uint8_t uaLByte, faLByte;
-float shPosX, shPosY, shPosZ;
-uint8_t shXByte, shYByte, shZByte;
+float shPosZ;
+uint8_t shZByte;
 float uaWeight, faWeight;
-uint8_t uaWByte, faWbyte;
+uint8_t uaWByte, faWByte;
 
 
 float th1, th2, th3, th4;
@@ -198,6 +198,7 @@ float calibButtonState;
 // MARS nad Calibration buttons states.
 volatile byte marsButton = 0;
 volatile byte calibButton = 0;
+volatile byte devButtons = 0;
 Bounce marsBounce = Bounce();
 Bounce calibBounce = Bounce();
 
@@ -232,7 +233,7 @@ float n;
 
 int offsetCnt;
 float theta1Enc, theta2Enc, theta3Enc, theta4Enc;
-float IMUtheta1, IMUtheta2, IMUtheta3, IMUtheta4, offset1, offset2, offset3, offset4;
+// float IMUtheta1, IMUtheta2, IMUtheta3, IMUtheta4, offset1, offset2, offset3, offset4;
 float ax1, ay1, az1, ax2, ay2, az2, ax3, ay3, az3;
 float norm1, norm2, norm3;
 

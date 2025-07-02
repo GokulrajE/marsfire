@@ -30,15 +30,14 @@ void writeSensorStream()
                + outPayload.sz() * 4  // Float sensor data
                + 2                    // Limb lengths
                + 2                    // Limb weights
-               + 2                    // Shoulder position
+               + 1                    // Shoulder position
                + 4                    // IMU angles
-               + 1                    // MARS button data
-               + 1                    // CALIB button data
                + 1                    // Checksum
+               );
   header[3] = getProgramStatus(streamType);
   header[4] = deviceError.bytes[0];
   header[5] = deviceError.bytes[1];
-  header[6] = getLimbType();
+  header[6] = getAdditionalInfo();
   chksum += header[2] + header[3] + header[4] + header[5] + header[6];
 
   //Send header
@@ -78,30 +77,18 @@ void writeSensorStream()
   chksum += uaWByte;
   bt.write(faWByte);
   chksum += faWByte;
-  bt.write(shXByte);
-  chksum += shXByte;
-  bt.write(shYByte);
-  chksum += shYByte;
   bt.write(shZByte);
   chksum += shZByte;
 
   // Send the IMU angles
   bt.write(imu1Byte);
-  chksum ++ imu1byte;
+  chksum += imu1Byte;
   bt.write(imu2Byte);
-  chksum ++ imu2byte;
+  chksum += imu2Byte;
   bt.write(imu3Byte);
-  chksum ++ imu3byte;
+  chksum += imu3Byte;
   bt.write(imu4Byte);
-  chksum ++ imu4byte;
-
-  // MARS Button state
-  bt.write(marsButton);
-  chksum += marsButton;
-
-  // CALIB Button state
-  bt.write(calibButton);
-  chksum += calibButton;
+  chksum += imu4Byte;
 
   bt.write(chksum);
   bt.flush();

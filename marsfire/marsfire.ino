@@ -68,7 +68,7 @@ void loop() {
 
   // // Relax. You only need to work at around 200Hz
   // delay(2);
-  // packetNumber.num += 1;
+  packetNumber.num += 1;
   // runTime.num = millis() - startTime;
   // time_ellapsed = millis()/1000.0;
 

@@ -100,6 +100,7 @@ void updateSensorData()
   marsButton = marsBounce.read();
   calibBounce.update();
   calibButton = calibBounce.read();
+  devButtons = (calibButton << 1) | marsButton;
 
   // 4. Read IMU data.
   updateImu();
@@ -131,9 +132,9 @@ byte getProgramStatus(byte dtype) {
 }
 
 
-byte getLimbType(void) {
-  // X | X | X | X | X | X | CURR LIMB | CURR LIMB
-  return currLimb;
+byte getAdditionalInfo(void) {
+  // X | X | CALIB | MARS | X | X | CURR LIMB | CURR LIMB
+  return (devButtons << 4) | currLimb;
 }
 
 // void readMarsButtonState(void) {

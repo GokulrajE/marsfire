@@ -69,10 +69,10 @@ void loop() {
   // // Relax. You only need to work at around 200Hz
   // delay(2);
   packetNumber.num += 1;
-  // runTime.num = millis() - startTime;
-  // time_ellapsed = millis()/1000.0;
+  runTime.num = millis() - startTime;
+  time_ellapsed = millis()/1000.0;
 
-  n = n + 1.0;
+  // n = n + 1.0;
 
   //  updateCalibButton();
   //  updateEncoders();
@@ -81,12 +81,12 @@ void loop() {
   //  //Serial.println("3");
   //  updateImu();
   //  readMarsButtonState();
-   controller();
+  //  controller();
    //Serial.println("4");
 
    writeSensorStream();
    //Serial.println("5");
-   readHandleIncomingMessage();
+  //  readHandleIncomingMessage();
 
   //Serial.println(IMUtheta1);
 
@@ -103,5 +103,5 @@ void loop() {
   // Serial.print('\t');
   // Serial.println(ax1);
 
-  delay(10);
+  // delay(10);
 }

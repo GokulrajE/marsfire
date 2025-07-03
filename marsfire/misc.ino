@@ -85,15 +85,23 @@ void updateSensorData()
   force2 = scale2.getData();
 
   // 2. Read the encoder data.
-  theta1Enc = read_angle_motor1();
-  theta2Enc = read_angle_motor2();
-  theta3Enc = read_angle_motor3();
-  theta4Enc = read_angle_motor4();
+  theta1Enc = read_angle1();
+  theta2Enc = read_angle2();
+  theta3Enc = read_angle3();
+  theta4Enc = read_angle4();
   
   theta1 = theta1Enc + offset1;
   theta2 = theta2Enc + offset2;
   theta3 = theta3Enc + offset3;
   theta4 = theta4Enc + offset4;
+  SerialUSB.print(theta1);
+  SerialUSB.print(" ");
+  SerialUSB.print(theta2);
+  SerialUSB.print(" ");
+  SerialUSB.print(theta3);
+  SerialUSB.print(" ");
+  SerialUSB.print(theta4);
+  SerialUSB.print("\n");
 
   // 3. Read buttons.
   marsBounce.update();
@@ -144,10 +152,10 @@ byte getAdditionalInfo(void) {
 
 // void updateEncoders()
 // {
-//   theta1Enc = read_angle_motor1();
-//   theta2Enc = read_angle_motor2();
-//   theta3Enc = read_angle_motor3();
-//   theta4Enc = read_angle_motor4();
+//   theta1Enc = read_angle1();
+//   theta2Enc = read_angle2();
+//   theta3Enc = read_angle3();
+//   theta4Enc = read_angle4();
   
 //   theta1 = theta1Enc + offset1;
 //   theta2 = theta2Enc + offset2;
@@ -166,7 +174,7 @@ byte getAdditionalInfo(void) {
 
 // }
 
-float read_angle_motor1()
+float read_angle1()
 {
   _enccount1 = angle1.read();
   if (_enccount1 >= ENC1MAXCOUNT) {
@@ -177,7 +185,7 @@ float read_angle_motor1()
   return ENC1COUNT2DEG * _enccount1;
 }
 
-float read_angle_motor2()
+float read_angle2()
 {
   _enccount2 = angle2.read();
   if (_enccount2 >= ENC1MAXCOUNT) {
@@ -188,7 +196,7 @@ float read_angle_motor2()
   return ENC2COUNT2DEG * _enccount2;
 }
 
-float read_angle_motor3()
+float read_angle3()
 {
   _enccount3 = angle3.read();
   if (_enccount3 >= ENC3MAXCOUNT) {
@@ -199,7 +207,7 @@ float read_angle_motor3()
   return ENC3COUNT2DEG * _enccount3;
 }
 
-float read_angle_motor4()
+float read_angle4()
 {
   _enccount4 = angle4.read();
   if (_enccount4 >= ENC4MAXCOUNT) {

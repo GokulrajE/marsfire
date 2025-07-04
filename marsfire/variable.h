@@ -150,6 +150,7 @@ Encoder angle3(ENC3A, ENC3B);
 long _enccount3;
 Encoder angle4(ENC4A, ENC4B);
 long _enccount4;
+float limbScale1, limbScale2, limbScale3, limbScale4; 
 float theta1, theta2, theta3, theta4;
 float offset1, offset2, offset3, offset4;
 

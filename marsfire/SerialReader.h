@@ -4,6 +4,8 @@
 
 #include "Arduino.h"
 
+#define INCOMING_HEADER_BYTE  0xAA
+
 enum ReaderState {
   WAITFORPACKET,
   HEADER1,

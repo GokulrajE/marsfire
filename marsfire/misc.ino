@@ -84,24 +84,11 @@ void updateSensorData()
   scale2.update();
   force2 = scale2.getData();
 
-  // 2. Read the encoder data.
-  theta1Enc = read_angle1();
-  theta2Enc = read_angle2();
-  theta3Enc = read_angle3();
-  theta4Enc = read_angle4();
-  
-  theta1 = theta1Enc + offset1;
-  theta2 = theta2Enc + offset2;
-  theta3 = theta3Enc + offset3;
-  theta4 = theta4Enc + offset4;
-  SerialUSB.print(theta1);
-  SerialUSB.print(" ");
-  SerialUSB.print(theta2);
-  SerialUSB.print(" ");
-  SerialUSB.print(theta3);
-  SerialUSB.print(" ");
-  SerialUSB.print(theta4);
-  SerialUSB.print("\n");
+  // 2. Read the encoder data.  
+  theta1 = limbScale1 * (read_angle1() + offset1);
+  theta2 = limbScale2 * (read_angle2() + offset2);
+  theta3 = limbScale3 * (read_angle3() + offset3);
+  theta4 = limbScale4 * (read_angle4() + offset4);
 
   // 3. Read buttons.
   marsBounce.update();
@@ -143,6 +130,21 @@ byte getProgramStatus(byte dtype) {
 byte getAdditionalInfo(void) {
   // X | X | CALIB | MARS | X | X | CURR LIMB | CURR LIMB
   return (devButtons << 4) | currLimb;
+}
+
+void setLimb(byte limb) {
+  currLimb = limb;
+  if (currLimb == LEFT) {
+    limbScale1 = -1.0;
+    limbScale2 = -1.0;
+    limbScale3 = -1.0;
+    limbScale4 = -1.0;
+  } else {
+    limbScale1 = 1.0;
+    limbScale2 = 1.0;
+    limbScale3 = 1.0;
+    limbScale4 = 1.0;
+  }
 }
 
 // void readMarsButtonState(void) {

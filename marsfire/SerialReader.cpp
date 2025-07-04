@@ -15,13 +15,13 @@ int SerialReader::readUpdate() {
     
     switch (_state) {
       case WAITFORPACKET:
-        if (_currByte == 0xFF) {
+        if (_currByte == INCOMING_HEADER_BYTE) {
           // First header found.
           _state = HEADER1;
         }
         break;
       case HEADER1:
-        if (_currByte == 0xFE) {
+        if (_currByte == INCOMING_HEADER_BYTE) {
           // Second header found.
           _state = HEADER2;
           
@@ -43,7 +43,7 @@ int SerialReader::readUpdate() {
           //btStatus = _currPlSz*1.0;
           _plCntr = 0;
           _state = PAYLOAD;
-          _chksum = 0xFF + 0xFE + _currByte;
+          _chksum = INCOMING_HEADER_BYTE + INCOMING_HEADER_BYTE + _currByte;
         }        
         break;
       case PAYLOAD:

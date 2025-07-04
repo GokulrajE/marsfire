@@ -23,7 +23,8 @@ void setup() {
   deviceSetUp();
 
   // Initialize variables.
-  currLimb = NOLIMB;
+  // Always use the setLimb function to change the limb.
+  setLimb(NOLIMB);
 
   // Device button settiongs
   readStream.begin(readHandleIncomingMessage, 1000);

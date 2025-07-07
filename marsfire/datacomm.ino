@@ -282,25 +282,25 @@ void readHandleIncomingMessage() {
         // Make sure the input limb is one of the valid options.
         setLimb(isValidLimb(_details) ? _details : NOLIMB);
         break;
-      // case CALIBRATE:
-      //   // This can be set only if there is no error.
-      //   if (deviceError.num != 0) break;
-      //   // This can only eb set if the control is NONE.
-      //   if (ctrlType != NONE) break;
-      //   // Check if the limb has been set.
-      //   if (currLimb == NOLIMB) break; 
-      //   // Reset calibration
-      //   // Check the calibration value
-      //   calib = NOCALIB;
-      //   currMech = _details;
-      //   if (currMech != NOMECH) {
-      //     // Set the encoder offset value
-      //     encOffsetCount = currMech == FPS ? -plutoEncoder.read() : plutoEncoder.read(); // ODD: This is MHCP mechanism specific.
-      //     calib = YESCALIB;
-      //   }
-      //   // Update limb-mech scale.
-      //   setLimmbMechScale();
-      //   break;
+      case CALIBRATE:
+        // This can be set only if there is no error.
+        if (deviceError.num != 0) break;
+        // This can only eb set if the control is NONE.
+        if (ctrlType != NONE) break;
+        // Check if the limb has been set.
+        if (currLimb == NOLIMB) break; 
+        // // Reset calibration
+        // // Check the calibration value
+        // calib = NOCALIB;
+        // currMech = _details;
+        // if (currMech != NOMECH) {
+        //   // Set the encoder offset value
+        //   encOffsetCount = currMech == FPS ? -plutoEncoder.read() : plutoEncoder.read(); // ODD: This is MHCP mechanism specific.
+        //   calib = YESCALIB;
+        // }
+        // Update limb-mech scale.
+        // setLimmbMechScale();
+        break;
       case GET_VERSION:
         stream = false;
         // Send the current firmware version.

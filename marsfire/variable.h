@@ -11,6 +11,8 @@
 #include "SoftwareSerial.h"
 #include "HX711_ADC.h"
 #include <Bounce2.h>
+#include "Wire.h"
+#include <MPU6050_light.h>
 
 // Define the PIN numbers
 #define CALIB_BUTTON          33
@@ -109,9 +111,11 @@
 #define MIN_SHLDR_Z_POS       100     // millimeters
 #define MAX_SHLDR_Z_POS       500     // millimeters
 
-
 // Heart beat related variable
 #define MAX_HBEAT_INTERVAL    2.0 // Seconds
+
+// Radians to degree conversion
+#define RAD2DEG(x)            180.0 * x / 3.141592
 
 // Version and device ID.
 const char* fwVersion = "25.07";
@@ -155,6 +159,9 @@ float theta1, theta2, theta3, theta4;
 float offset1, offset2, offset3, offset4;
 
 // IMU angles and their codes.
+MPU6050 mpu(Wire);
+MPU6050 mpu2(Wire1);
+MPU6050 mpu3(Wire1);
 float IMUtheta1, IMUtheta2, IMUtheta3, IMUtheta4;
 int8_t imu1Byte, imu2Byte, imu3Byte, imu4Byte;
 

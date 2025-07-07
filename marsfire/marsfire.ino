@@ -4,12 +4,6 @@
 #include "SerialReader.h"
 #include <HX711_ADC.h>
 
-#include "Wire.h"
-#include <MPU6050_light.h>
-
-MPU6050 mpu(Wire);
-MPU6050 mpu2(Wire1);
-MPU6050 mpu3(Wire1);
 
 void setup() {
   Serial.begin(115200);

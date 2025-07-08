@@ -288,18 +288,30 @@ void readHandleIncomingMessage() {
         // This can only eb set if the control is NONE.
         if (ctrlType != NONE) break;
         // Check if the limb has been set.
-        if (currLimb == NOLIMB) break; 
-        // // Reset calibration
-        // // Check the calibration value
-        // calib = NOCALIB;
-        // currMech = _details;
-        // if (currMech != NOMECH) {
-        //   // Set the encoder offset value
-        //   encOffsetCount = currMech == FPS ? -plutoEncoder.read() : plutoEncoder.read(); // ODD: This is MHCP mechanism specific.
-        //   calib = YESCALIB;
-        // }
-        // Update limb-mech scale.
-        // setLimmbMechScale();
+        if (currLimb == NOLIMB) break;
+        // Reset calibration
+        // Check the calibration value
+        calib = NOCALIB;
+        // Ensure that the IMU angles are not too off.
+        if ((imuTheta1 < CALIB_IMU_ANGLE_MIN) || 
+            (imuTheta2 < CALIB_IMU_ANGLE_MIN) || 
+            (imuTheta3 < CALIB_IMU_ANGLE_MIN) || 
+            (imuTheta4 < CALIB_IMU_ANGLE_MIN) || 
+            (imuTheta1 > CALIB_IMU_ANGLE_MAX) || 
+            (imuTheta2 > CALIB_IMU_ANGLE_MAX) || 
+            (imuTheta3 > CALIB_IMU_ANGLE_MAX) || 
+            (imuTheta4 > CALIB_IMU_ANGLE_MAX)) break;
+        // Set the offset angles.
+        theta1Offset = imuTheta1;
+        theta2Offset = imuTheta2;
+        theta3Offset = imuTheta3;
+        theta4Offset = imuTheta4;
+        // Reset encoder counts.
+        angle1.write(0);
+        angle2.write(0);
+        angle3.write(0);
+        angle4.write(0);
+        calib = YESCALIB;
         break;
       case GET_VERSION:
         stream = false;

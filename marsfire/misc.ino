@@ -83,10 +83,10 @@ void updateSensorData() {
   force2 = scale2.getData();
 
   // 2. Read the encoder data.
-  theta1 = limbScale1 * (read_angle1() + offset1);
-  theta2 = limbScale2 * (read_angle2() + offset2);
-  theta3 = limbScale3 * (read_angle3() + offset3);
-  theta4 = limbScale4 * (read_angle4() + offset4);
+  theta1 = limbScale1 * (read_angle1() + theta1Offset);
+  theta2 = limbScale2 * (read_angle2() + theta2Offset);
+  theta3 = limbScale3 * (read_angle3() + theta3Offset);
+  theta4 = limbScale4 * (read_angle4() - theta4Offset);
 
   // 3. Read buttons.
   marsBounce.update();
@@ -97,6 +97,11 @@ void updateSensorData() {
 
   // 4. Read IMU data.
   updateImu();
+
+  // Add data to the IMU offset buffers if calibration is not done.
+  if (calib == NOCALIB) {
+
+  }
 }
 
 
@@ -232,6 +237,9 @@ void imuSetup() {
 }
 
 void updateImu() {
+  float ax1, ay1, az1, ax2, ay2, az2, ax3, ay3, az3;
+  float norm1, norm2, norm3, norm_sum;
+
   mpu.update();
   mpu2.update();
   mpu3.update();
@@ -250,45 +258,25 @@ void updateImu() {
 
   norm1 = pow(ax1 * ax1 + ay1 * ay1, 0.5);
   norm2 = pow(ax2 * ax2 + ay2 * ay2, 0.5);
-  norm3 = pow(ax3 * ax3 + ay3 * ay3, 0.5);
+  norm3 = pow(ay3 * ay3 + az3 * az3, 0.5);
+  norm_sum = norm1 + norm2;
 
   // Theta 1.
-  IMUtheta1 = RAD2DEG(atan2(ax1, ay1));
-  IMUtheta2 = RAD2DEG(atan2(-az1, norm1));
-  IMUtheta2 = RAD2DEG(atan2(-az1, norm1));
-  IMUtheta3 = 180 / 3.14 * (-atan2(az2, -ay2)) - IMUtheta2;
-  IMUtheta4 = 180 / 3.14 * atan2(-ax3, ay3) - IMUtheta2 - IMUtheta3;
+  imuTheta1 = (norm1 * RAD2DEG(atan2(ax1, ay1))
+               + norm2 * RAD2DEG(atan2(ax2, ay2))) / norm_sum;
+  imuTheta1 -= IMU1OFFSET; 
+  imuTheta2 = RAD2DEG(atan2(-az1, norm1));
+  imuTheta2 -= IMU2OFFSET; 
+  imuTheta3 = RAD2DEG(atan2(-az2, norm2)) - imuTheta2;
+  imuTheta3 -= IMU3OFFSET; 
+  imuTheta4 = RAD2DEG(atan2(-ax3, norm3)) - imuTheta2 - imuTheta3;
+  imuTheta4 -= IMU4OFFSET; 
 
-  SerialUSB.print("IMU 1: ");
-  SerialUSB.print(ax1);
-  SerialUSB.print(",");
-  SerialUSB.print(ay1);
-  SerialUSB.print(",");
-  SerialUSB.print(az1);
-  SerialUSB.print(" => ");
-  SerialUSB.println(IMUtheta1);
-  SerialUSB.print("IMU 2: ");
-  SerialUSB.print(ax2);
-  SerialUSB.print(",");
-  SerialUSB.print(ay2);
-  SerialUSB.print(",");
-  SerialUSB.print(az2);
-  SerialUSB.print(" => ");
-  SerialUSB.println(IMUtheta1);
-  SerialUSB.print("IMU 3: ");
-  SerialUSB.print(ax3);
-  SerialUSB.print(",");
-  SerialUSB.print(ay3);
-  SerialUSB.print(",");
-  SerialUSB.print(az3);
-  SerialUSB.print(" => ");
-  SerialUSB.println(IMUtheta1);
-
-  // Update the IMU angle butes
-  imu1Byte = (int8_t)IMUtheta1;
-  imu2Byte = (int8_t)IMUtheta2;
-  imu3Byte = (int8_t)IMUtheta3;
-  imu4Byte = (int8_t)IMUtheta4;
+  // Update the IMU angle bytes
+  imu1Byte = (int8_t) imuTheta1;
+  imu2Byte = (int8_t) imuTheta2;
+  imu3Byte = (int8_t) imuTheta3;
+  imu4Byte = (int8_t) imuTheta4;
 }
 
 // void calibButtonSetup()

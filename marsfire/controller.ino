@@ -20,10 +20,10 @@ void controller()
     {
         if (offsetCnt == 0)
         {
-            offset1 = IMUtheta1 - theta1Enc;
-            offset2 = IMUtheta2 - theta2Enc;
-            offset3 = IMUtheta3 - theta3Enc;
-            offset4 = IMUtheta4 - theta4Enc;
+            theta1Offset = imuTheta1 - theta1Enc;
+            theta2Offset = imuTheta2 - theta2Enc;
+            theta3Offset = imuTheta3 - theta3Enc;
+            theta4Offset = imuTheta4 - theta4Enc;
         }
         
         offsetCnt++;

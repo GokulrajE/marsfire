@@ -95,6 +95,16 @@
 #define NOCALIB               0x00
 #define YESCALIB              0x01
 
+// IMU offsets
+#define IMU1OFFSET            0.00
+#define IMU2OFFSET            0.00
+#define IMU3OFFSET            0.00
+#define IMU4OFFSET            0.00
+
+// Calibration angle limits
+#define CALIB_IMU_ANGLE_MIN   -20.0
+#define CALIB_IMU_ANGLE_MAX   +20.0
+
 // Human limb parameter ranges
 #define MIN_UA_LENGTH         200     // millimeters
 #define MAX_UA_LENGTH         400     // millimeters
@@ -156,13 +166,15 @@ Encoder angle4(ENC4A, ENC4B);
 long _enccount4;
 float limbScale1, limbScale2, limbScale3, limbScale4; 
 float theta1, theta2, theta3, theta4;
-float offset1, offset2, offset3, offset4;
+
+// Calibration related variables.
+float theta1Offset, theta2Offset, theta3Offset, theta4Offset;
 
 // IMU angles and their codes.
 MPU6050 mpu(Wire);
 MPU6050 mpu2(Wire1);
 MPU6050 mpu3(Wire1);
-float IMUtheta1, IMUtheta2, IMUtheta3, IMUtheta4;
+float imuTheta1, imuTheta2, imuTheta3, imuTheta4;
 int8_t imu1Byte, imu2Byte, imu3Byte, imu4Byte;
 
 // Human limb parameters and their codes.
@@ -241,9 +253,6 @@ float n;
 
 int offsetCnt;
 float theta1Enc, theta2Enc, theta3Enc, theta4Enc;
-// float IMUtheta1, IMUtheta2, IMUtheta3, IMUtheta4, offset1, offset2, offset3, offset4;
-float ax1, ay1, az1, ax2, ay2, az2, ax3, ay3, az3;
-float norm1, norm2, norm3;
 
 // Serial Reader object
 SerialReader serReader;

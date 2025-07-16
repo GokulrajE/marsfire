@@ -14,7 +14,6 @@ void writeSensorStream()
   byte chksum = 0xFE;
   byte _temp;
 
-
   //Out data buffer
   outPayload.newPacket();
   outPayload.add(theta1);
@@ -22,6 +21,9 @@ void writeSensorStream()
   outPayload.add(theta3);
   outPayload.add(theta4);
   outPayload.add(force1);
+  outPayload.add(xEp);
+  outPayload.add(yEp);
+  outPayload.add(zEp);
 
   // Send packet.
   header[2] = (4                      // Four headers
@@ -118,29 +120,17 @@ void readHandleIncomingMessage() {
         stream = true;
         streamType = DIAGNOSTICS;
         break;
-      // case SET_CONTROL_TYPE:
-      //   #if SERIALUSB_DEBUG
-      //     // Debug print
-      //     SerialUSB.print("\nControl Type: ");
-      //     SerialUSB.print(currMech);
-      //     SerialUSB.print(" ");
-      //     SerialUSB.print(deviceError.num);
-      //     SerialUSB.print(" ");
-      //     SerialUSB.print(_details);
-      //     SerialUSB.print(" ");
-      //   #endif
-      //   // This can be set only if there is not error.
-      //   if (deviceError.num != 0) break;
-      //   // This can only be set if a mechanism is selected, 
-      //   // and calibration has been done.
-      //   if ((currMech == NOMECH) || (calib == NOCALIB)) break;
-      //   // No Error, Mechanism set and calibrated.
-      //   setControlType(_details);
-      //   #if SERIALUSB_DEBUG
-      //     SerialUSB.print(ctrlType);
-      //     SerialUSB.print("\n");
-      //   #endif
-      //   break;
+      case SET_CONTROL_TYPE:
+        ctrlType = NONE;
+        // This can be set only if there is not error.
+        if (deviceError.num != 0) break;
+        // Device must be calibration.
+        if (calib == NOCALIB) break;
+        // Limb has to be set.
+        if (currLimb == NOLIMB) break;
+        // Set control.
+        setControlType(_details);
+        break;
       // case SET_CONTROL_TARGET:
       //   #if SERIALUSB_DEBUG
       //     SerialUSB.print("Control Target: ");
@@ -281,6 +271,18 @@ void readHandleIncomingMessage() {
         calib = NOCALIB;
         // Make sure the input limb is one of the valid options.
         setLimb(isValidLimb(_details) ? _details : NOLIMB);
+        break;
+      case SET_LIMB_KIN_PARAM:
+        // This can be set only if there is no error.
+        if (deviceError.num != 0) break;
+        // This can only be set if the control is NONE.
+        if (ctrlType != NONE) break;
+        // Check if the limb has been set.
+        if (currLimb == NOLIMB) break;
+        // This can only be set if the robot has been calibrated.
+        if (calib == NOCALIB) break;
+        // Unpack the data and set the limb parameters.
+        limbKinParam = setHumanLimbKinParams(serReader.payload, 1);
         break;
       case CALIBRATE:
         // This can be set only if there is no error.

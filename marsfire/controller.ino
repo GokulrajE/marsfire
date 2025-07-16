@@ -91,7 +91,7 @@ void controller()
     // torque control
     if (des3 == 2006 && PCParam == 0x00)
     {
-        
+
         stat++;
         
         if (des1 > 0.1)

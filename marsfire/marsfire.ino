@@ -32,6 +32,8 @@ void setup() {
   stream = true;
   ctrlType = NONE;
   calib = NOCALIB;
+  limbKinParam = NOLIMBKINPARAM;
+  limbDynParam = NOLIMBDYNPARAM;
   deviceError.num = 0x0000;
 
   // Reset packet number and run time.
@@ -58,8 +60,8 @@ void loop() {
   //   writeSensorStream();
   // }
 
-  // // Update control
-  // updateControlLaw();
+  // Update control
+  updateControlLaw();
 
   // // Relax. You only need to work at around 200Hz
   // delay(2);

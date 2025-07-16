@@ -87,6 +87,8 @@ void updateSensorData() {
   theta2 = limbScale2 * (read_angle2() + theta2Offset);
   theta3 = limbScale3 * (read_angle3() + theta3Offset);
   theta4 = limbScale4 * (read_angle4() - theta4Offset);
+  // 2a. Update actual angle buffer
+  actual.add(theta1);
 
   // 3. Read buttons.
   marsBounce.update();
@@ -98,10 +100,11 @@ void updateSensorData() {
   // 4. Read IMU data.
   updateImu();
 
-  // Add data to the IMU offset buffers if calibration is not done.
-  if (calib == NOCALIB) {
+  // 5. Compute robot endpoint position.
+  updateEndpointPosition();
 
-  }
+  // 6. Compute the human limb joint angles. 
+
 }
 
 
@@ -130,8 +133,8 @@ byte getProgramStatus(byte dtype) {
 
 
 byte getAdditionalInfo(void) {
-  // X | X | CALIB | MARS | X | X | CURR LIMB | CURR LIMB
-  return (devButtons << 4) | currLimb;
+  // X | X | CALIB | MARS | LIMBDYNPARAM | LIMBKINPARAM | CURR LIMB | CURR LIMB
+  return (devButtons << 4) | (limbDynParam << 3) | (limbKinParam << 2) | currLimb;
 }
 
 void setLimb(byte limb) {
@@ -147,6 +150,12 @@ void setLimb(byte limb) {
     limbScale3 = 1.0;
     limbScale4 = 1.0;
   }
+}
+
+bool isWithinRange(float val, float minVal, float maxVal) {
+  if (val < minVal) return false;
+  else if (val  > maxVal) return false;
+  return true; 
 }
 
 // void readMarsButtonState(void) {

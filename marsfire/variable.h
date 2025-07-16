@@ -76,6 +76,8 @@
 #define SET_CONTROL_TYPE      0x06
 #define SET_CONTROL_TARGET    0x07
 #define SET_DIAGNOSTICS       0x08
+#define SET_LIMB_KIN_PARAM    0x09
+#define SET_LIMB_DYN_PARAM    0x0A
 #define HEARTBEAT             0x80
 
 // Control Law Related Definitions
@@ -95,6 +97,12 @@
 #define NOCALIB               0x00
 #define YESCALIB              0x01
 
+// Limb parameter status
+#define NOLIMBKINPARAM        0x00
+#define YESLIMBKINPARAM       0x01
+#define NOLIMBDYNPARAM        0x00
+#define YESLIMBDYNPARAM       0x01
+
 // IMU offsets
 #define IMU1OFFSET            0.00
 #define IMU2OFFSET            0.00
@@ -104,6 +112,10 @@
 // Calibration angle limits
 #define CALIB_IMU_ANGLE_MIN   -20.0
 #define CALIB_IMU_ANGLE_MAX   +20.0
+
+// MARS robot parameters.
+#define L1                    475     // millimeters
+#define L2                    291     // millimeters
 
 // Human limb parameter ranges
 #define MIN_UA_LENGTH         200     // millimeters
@@ -126,6 +138,7 @@
 
 // Radians to degree conversion
 #define RAD2DEG(x)            180.0 * x / 3.141592
+#define DEG2RAD(x)            3.141592 * x / 180.0
 
 // Version and device ID.
 const char* fwVersion = "25.07";
@@ -140,6 +153,8 @@ byte streamType = SENSORSTREAM;
 bool stream = true;
 byte ctrlType = NONE;
 byte calib = NOCALIB;
+byte limbKinParam = NOLIMBKINPARAM;
+byte limbDynParam = NOLIMBDYNPARAM;
 uint16union_t deviceError;
 
 // Packet Counter.
@@ -154,8 +169,11 @@ byte currLimb;
 
 // Control related variables.
 float target;
+Buffer actual;
+Buffer desired;
+Buffer control;
 
-// Kinematics related variables.
+// Joint kinematics related variables.
 Encoder angle1(ENC1A, ENC1B);
 long _enccount1;
 Encoder angle2(ENC2A, ENC2B);
@@ -176,6 +194,9 @@ MPU6050 mpu2(Wire1);
 MPU6050 mpu3(Wire1);
 float imuTheta1, imuTheta2, imuTheta3, imuTheta4;
 int8_t imu1Byte, imu2Byte, imu3Byte, imu4Byte;
+
+// Endpoint kinematics of the robot.
+float xEp, yEp, zEp;
 
 // Human limb parameters and their codes.
 float uaLength, faLength;

@@ -75,31 +75,26 @@ void updateHumanLimbDynParamBytes()
   faWByte = (byte) 255 * (faWeight - MIN_FA_WEIGHT) / (MAX_FA_WEIGHT - MIN_FA_WEIGHT);
 }
 
-// void setHumanLimbParams(uint8_t uaL, uint8_t faL, uint8_t uaW, uint8_t faW, int8_t shZ)
-// {
-//   // Upper arm parameters
-//   uaLByte = uaL;
-//   uaLength = MIN_UA_LENGTH + (MAX_UA_LENGTH - MIN_UA_LENGTH) * (uaLByte / 255.0);
-//   uaWByte = uaW;
-//   uaWeight = MIN_UA_WEIGHT + (MAX_UA_WEIGHT - MIN_UA_WEIGHT) * (uaWByte / 255.0);
-//   // Forearm parameters
-//   faLByte = faL;
-//   faLength = MIN_FA_LENGTH + (MAX_FA_LENGTH - MIN_FA_LENGTH) * (uaLByte / 255.0);
-//   faWByte = uaW;
-//   faWeight = MIN_FA_WEIGHT + (MAX_FA_WEIGHT - MIN_FA_WEIGHT) * (uaWByte / 255.0);
-//   // Shoulder Z position
-//   shZByte = shZ;
-//   shPosZ = MIN_SHLDR_Z_POS + (MAX_SHLDR_Z_POS - MIN_SHLDR_Z_POS) * (shZByte / 255.0);
-// }
-
 void updateEndpointPosition()
 {
   // arm inverse kinematics
-  float _t1 = DEG2RAD(theta1);
-  float _t2 = DEG2RAD(theta2);
-  float _t3 = DEG2RAD(theta3);
-  float _temp = L1 * cos(_t2) + L2 * cos(_t2 + _t3);
-  xEp = cos(_t1) * _temp;
-  yEp = sin(_t1) * _temp;
-  zEp = - L1 * sin(_t2) - L2 * sin(_t2 + _t3);
+  // float _t1 = DEG2RAD(theta1);
+  // float _t2 = DEG2RAD(theta2);
+  // float _t3 = DEG2RAD(theta3);
+  float _temp = L1 * cos2 + L2 * cos(theta2r + theta3r);
+  xEp = cos1 * _temp;
+  yEp = sin1 * _temp;
+  zEp = - L1 * sin2 - L2 * sin(theta2r + theta3r);
+}
+
+float getMarsGravityCompensationTorque()
+{
+  return (marsGCParam[0] * cos1
+          + marsGCParam[1] * sin1
+          + marsGCParam[2] * cos2 * sin1
+          + marsGCParam[3] * cos2 * cos3 * sin1
+          + marsGCParam[4] * sin1 * sin2
+          + marsGCParam[5] * cos3 * sin1 * sin2
+          + marsGCParam[6] * cos2 * sin1 * sin3
+          + marsGCParam[7] * sin1 * sin2 * sin3);
 }

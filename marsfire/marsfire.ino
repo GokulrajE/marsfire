@@ -25,10 +25,10 @@ void setup() {
 
   // Set targets to invalid value 999.
   target = INVALID_TARGET;
-  // desired.add(INVALID_TARGET);
+  desired.add(INVALID_TARGET);
 
   // Initialize variable.
-  streamType = SENSORSTREAM;
+  streamType = DIAGNOSTICS; //SENSORSTREAM;
   stream = true;
   ctrlType = NONE;
   calib = NOCALIB;
@@ -40,6 +40,7 @@ void setup() {
   packetNumber.num = 0;
   startTime = millis();
   runTime.num = 0;
+  delTime = 1.0;
 
   // Last received heart beat time
   lastRxdHeartbeat = millis();
@@ -66,8 +67,10 @@ void loop() {
   // // Relax. You only need to work at around 200Hz
   // delay(2);
   packetNumber.num += 1;
-  runTime.num = millis() - startTime;
-  time_ellapsed = millis()/1000.0;
+  currMilliCount = millis();
+  runTime.num = currMilliCount - startTime;
+  delTime = (currMilliCount - prevMilliCount) / 1000.0;
+  prevMilliCount = currMilliCount;
 
   // n = n + 1.0;
 

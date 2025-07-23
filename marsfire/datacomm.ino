@@ -24,6 +24,18 @@ void writeSensorStream()
   outPayload.add(xEp);
   outPayload.add(yEp);
   outPayload.add(zEp);
+  outPayload.add(target);
+  outPayload.add(desired.val(0));
+  outPayload.add(control.val(0));
+
+  // Add additional data if in DIAGNOSTICS mode
+  if (streamType == DIAGNOSTICS) {
+    outPayload.add(err);
+    outPayload.add(errdiff);
+    outPayload.add(errsum);
+    outPayload.add(marsGCTorque);
+    outPayload.add(omega1);
+  }
 
   // Send packet.
   header[2] = (4                      // Four headers
@@ -131,43 +143,19 @@ void readHandleIncomingMessage() {
         // Set control.
         setControlType(_details);
         break;
-      // case SET_CONTROL_TARGET:
-      //   #if SERIALUSB_DEBUG
-      //     SerialUSB.print("Control Target: ");
-      //     SerialUSB.print(currMech);
-      //     SerialUSB.print(" ");
-      //     SerialUSB.print(deviceError.num);
-      //     SerialUSB.print("\n");
-      //   #endif
-      //   // This can be set only if there is not error.
-      //   if (deviceError.num != 0) break;
-      //   // No Error
-      //   // Check if the current control type is POSITION or TORQUE.
-      //   if ((ctrlType == POSITION)
-      //       || (ctrlType == POSITIONLINEAR)
-      //       || (ctrlType == TORQUE)
-      //       || (ctrlType == TORQUELINEAR)) {
-      //     // Set target.
-      //     setTarget(serReader.payload, 1, ctrlType);
-      //     // Initial time.
-      //     initTime = runTime.num / 1000.0f + strtTime;
-      //     // Reset the control hold value.
-      //     setControlHold(CONTROL_FREE);
-      //     #if SERIALUSB_DEBUG
-      //       SerialUSB.print("Target set: ");
-      //       SerialUSB.print(strtPos);
-      //       SerialUSB.print(",");
-      //       SerialUSB.print(strtTime);
-      //       SerialUSB.print(",");
-      //       SerialUSB.print(target);
-      //       SerialUSB.print(",");
-      //       SerialUSB.print(reachDur);
-      //       SerialUSB.print(",");
-      //       SerialUSB.print(initTime);
-      //       SerialUSB.print("\n");
-      //     #endif
-      //   }
-      //   break;
+      case SET_CONTROL_TARGET:
+        // This can be set only if there is not error.
+        if (deviceError.num != 0) break;
+        // No Error
+        // Check if the current control type is POSITION or TORQUE.
+        if ((ctrlType == POSITION)
+            || (ctrlType == TORQUE)) {
+          // Set target.
+          setTarget(serReader.payload, 1);
+          // Initial time.
+          initTime = runTime.num / 1000.0f + strtTime;
+        }
+        break;
       // case SET_CONTROL_BOUND:
       //   // This can be set only if there is no error.
       //   if (deviceError.num != 0) break;

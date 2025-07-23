@@ -83,12 +83,37 @@ void updateSensorData() {
   force2 = scale2.getData();
 
   // 2. Read the encoder data.
-  theta1 = limbScale1 * (read_angle1() + theta1Offset);
-  theta2 = limbScale2 * (read_angle2() + theta2Offset);
-  theta3 = limbScale3 * (read_angle3() + theta3Offset);
-  theta4 = limbScale4 * (read_angle4() - theta4Offset);
+  // Update previous values.
+  theta1Prev = theta1;
+  theta2Prev = theta2;
+  theta3Prev = theta3;
+  theta4Prev = theta4;
+  // Read the current values.
+  theta1 = limbAngleScale * (read_angle1() + theta1Offset);
+  theta2 = limbAngleScale * (read_angle2() + theta2Offset);
+  theta3 = limbAngleScale * (read_angle3() + theta3Offset);
+  theta4 = limbAngleScale * (read_angle4() - theta4Offset);
+  // Angle in radians.
+  theta1r = DEG2RAD(theta1);
+  theta2r = DEG2RAD(theta2);
+  theta3r = DEG2RAD(theta3);
+  theta4r = DEG2RAD(theta4);
+  // Cosine and Sine terms.
+  cos1 = cos(theta1r);
+  cos2 = cos(theta2r);
+  cos3 = cos(theta3r);
+  cos4 = cos(theta4r);
+  sin1 = sin(theta1r);
+  sin2 = sin(theta2r);
+  sin3 = sin(theta3r);
+  sin4 = sin(theta4r);
   // 2a. Update actual angle buffer
   actual.add(theta1);
+  // 2b. Compute the angular velocities
+  omega1 = (theta1 - theta1Prev) / delTime;
+  omega2 = (theta2 - theta2Prev) / delTime;
+  omega3 = (theta3 - theta3Prev) / delTime;
+  omega4 = (theta4 - theta4Prev) / delTime;
 
   // 3. Read buttons.
   marsBounce.update();
@@ -140,15 +165,11 @@ byte getAdditionalInfo(void) {
 void setLimb(byte limb) {
   currLimb = limb;
   if (currLimb == LEFT) {
-    limbScale1 = -1.0;
-    limbScale2 = -1.0;
-    limbScale3 = -1.0;
-    limbScale4 = -1.0;
+    limbAngleScale = -1.0;
+    limbControlScale = 1.0;
   } else {
-    limbScale1 = 1.0;
-    limbScale2 = 1.0;
-    limbScale3 = 1.0;
-    limbScale4 = 1.0;
+    limbAngleScale = 1.0;
+    limbControlScale = -1.0;
   }
 }
 
@@ -297,3 +318,26 @@ void updateCalibButton() {
   calibButtonState = 1.0 * digitalRead(CALIB_BUTTON);
   // Serial.println(digitalRead(calib_button_pin));
 }
+
+// Set toque/position target
+void setTarget(byte* payload, int strtInx) {
+  int inx = strtInx;
+  floatunion_t temp;
+  // The are four floats: start position, start time, target, duration.
+  // Initial position
+  _assignFloatUnionBytes(inx, payload, &temp);
+  strtPos = temp.num;
+  // Initial time
+  inx += 4;
+  _assignFloatUnionBytes(inx, payload, &temp);
+  strtTime = min(0, temp.num);
+  // Target
+  inx += 4;
+  _assignFloatUnionBytes(inx, payload, &temp);
+  target = temp.num;
+  // Duration
+  inx += 4;
+  _assignFloatUnionBytes(inx, payload, &temp);
+  tgtDur = max(MIN_TARGET_DUR, temp.num);
+}
+

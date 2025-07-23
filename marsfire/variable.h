@@ -21,6 +21,7 @@
 #define MOTOR_PWM             37
 #define MOTOR_ENABLE          38
 #define MOTOR_DIR             39
+#define MOTOR_T2I             3.35  // A / Nm
 // int PWMpin_theta1 = 37;
 // int enablepin_theta1 = 38;
 // int directionpin_theta1 = 39;
@@ -87,6 +88,8 @@
 #define MINPWM                410     // 10% of 4095
 #define MAXPWM                3686    // 90% of 4095
 #define MAXDELPWM             40      // Changed from 5
+#define MAX_CURRENT           10
+#define POS_CTRL_DBAND        0
 
 // Error types 
 #define ANGSENSERR            0x0001
@@ -112,6 +115,10 @@
 // Calibration angle limits
 #define CALIB_IMU_ANGLE_MIN   -20.0
 #define CALIB_IMU_ANGLE_MAX   +20.0
+
+// Control related constant
+#define MARS_GRAV_COMP_ADJUST 1.5
+#define MIN_TARGET_DUR        2.0     // Seconds
 
 // MARS robot parameters.
 #define L1                    475     // millimeters
@@ -145,6 +152,18 @@ const char* fwVersion = "25.07";
 const char* deviceId  = "MARS-HOMER";
 const char* compileDate = __DATE__ " " __TIME__;
 
+// MARS Gravity Compensation Parameters
+const float marsGCParam[] = {
+  -0.00423728,
+  -1.18992423,
+   3.74296361,
+   1.19731609,
+   1.99763005,
+   0.24580473,
+  -0.16474236,
+   1.30690941
+};
+
 // Last received heartbeat time.
 float lastRxdHeartbeat = 0.0f;
 
@@ -163,6 +182,9 @@ uint16union_t packetNumber;
 // run time
 unsigned long startTime;
 ulongunion_t runTime;
+unsigned long currMilliCount;
+unsigned long prevMilliCount;
+float delTime;
 
 // Current limb
 byte currLimb;
@@ -182,8 +204,16 @@ Encoder angle3(ENC3A, ENC3B);
 long _enccount3;
 Encoder angle4(ENC4A, ENC4B);
 long _enccount4;
-float limbScale1, limbScale2, limbScale3, limbScale4; 
+float limbAngleScale;
+float limbControlScale; 
 float theta1, theta2, theta3, theta4;
+float theta1Prev, theta2Prev, theta3Prev, theta4Prev;
+float theta1r, theta2r, theta3r, theta4r;
+float omega1, omega2, omega3, omega4;
+
+// Cosine and sine terms of the individual angles.
+float cos1, cos2, cos3, cos4;
+float sin1, sin2, sin3, sin4;
 
 // Calibration related variables.
 float theta1Offset, theta2Offset, theta3Offset, theta4Offset;
@@ -206,6 +236,17 @@ uint8_t shZByte;
 float uaWeight, faWeight;
 uint8_t uaWByte, faWByte;
 
+// Controller gains
+float pcKp = 1.5;
+float pcKd = 7.8;
+float pcKi = 0;
+// Control related buffers
+float err;
+float errdiff;
+float errsum;
+float marsGCTorque;
+// Desired target related variables.
+float strtPos, strtTime, initTime, tgtDur; 
 
 float th1, th2, th3, th4;
 float upperArm, foreArm;
@@ -245,7 +286,6 @@ Bounce calibBounce = Bounce();
 
 
 //Encoder angle5(ENC5A, ENC5B);
-
 
 
 //HX711 scale1;

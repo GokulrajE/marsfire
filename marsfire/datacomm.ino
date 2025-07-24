@@ -20,7 +20,7 @@ void writeSensorStream()
   outPayload.add(theta2);
   outPayload.add(theta3);
   outPayload.add(theta4);
-  outPayload.add(force1);
+  outPayload.add(epForce);
   outPayload.add(xEp);
   outPayload.add(yEp);
   outPayload.add(zEp);
@@ -35,6 +35,7 @@ void writeSensorStream()
     outPayload.add(errsum);
     outPayload.add(marsGCTorque);
     outPayload.add(omega1);
+    outPayload.add(dTorque);
   }
 
   // Send packet.
@@ -112,6 +113,7 @@ void writeSensorStream()
 // Read and handle incoming messages.
 // Many commands will be ignored if there is a device error.
 void readHandleIncomingMessage() {
+  byte _cmdSet = 0x00;
   byte _details;
   int plSz = serReader.readUpdate();
 
@@ -124,13 +126,16 @@ void readHandleIncomingMessage() {
       case START_STREAM:
         stream = true;
         streamType = SENSORSTREAM;
+        _cmdSet = 0x01;
         break;
       case STOP_STREAM:
         stream = false;
+        _cmdSet = 0x01;
         break;
       case SET_DIAGNOSTICS:
         stream = true;
         streamType = DIAGNOSTICS;
+        _cmdSet = 0x01;
         break;
       case SET_CONTROL_TYPE:
         ctrlType = NONE;
@@ -142,18 +147,39 @@ void readHandleIncomingMessage() {
         if (currLimb == NOLIMB) break;
         // Set control.
         setControlType(_details);
+        _cmdSet = 0x01;
         break;
       case SET_CONTROL_TARGET:
+        // Make sure that a minimum amount of time has passed since the previous target set.
+        if (safetyTimerTargetSetBlackout * delTime < TARGET_SET_BACKOUT) break;
+        // Reset the timer.
+        safetyTimerTargetSetBlackout = -1;
         // This can be set only if there is not error.
         if (deviceError.num != 0) break;
-        // No Error
+        // Ensure that the position or torque is not changing too rapidly.
+        // This can lead to oscillations.
+        if ((abs(omega1) > POSITION_RATE_LIMIT) || (abs(dTorque) > TORQUE_RATE_LIMIT)) break;
+        // All preliminary checks are done.
         // Check if the current control type is POSITION or TORQUE.
-        if ((ctrlType == POSITION)
-            || (ctrlType == TORQUE)) {
+        if ((ctrlType == POSITION) || (ctrlType == TORQUE)) {
+          // Parse the target details.
+          parseTargetDetails(serReader.payload, 1, tempArray);
+          // Check that the target is within the appropriate limits.
+          // tempArray[2] has the target value.
+          if ((ctrlType == POSITION) && 
+              (isWithinRange(tempArray[2], POSITION_TARGET_MIN, POSITION_TARGET_MAX) == false)) break;
+          if ((ctrlType == TORQUE) &&
+              (isWithinRange(tempArray[2], TORQUE_TARGET_MIN, TORQUE_TARGET_MAX) == false)) break;
           // Set target.
-          setTarget(serReader.payload, 1);
+          strtPos = tempArray[0];
+          strtTime = tempArray[1];
+          target = tempArray[2];
+          tgtDur = tempArray[3];
           // Initial time.
           initTime = runTime.num / 1000.0f + strtTime;
+          // Set the timer.
+          safetyTimerTargetSetBlackout = 0;
+          _cmdSet = 0x01;
         }
         break;
       // case SET_CONTROL_BOUND:
@@ -259,6 +285,7 @@ void readHandleIncomingMessage() {
         calib = NOCALIB;
         // Make sure the input limb is one of the valid options.
         setLimb(isValidLimb(_details) ? _details : NOLIMB);
+        _cmdSet = 0x01;
         break;
       case SET_LIMB_KIN_PARAM:
         // This can be set only if there is no error.
@@ -271,6 +298,7 @@ void readHandleIncomingMessage() {
         if (calib == NOCALIB) break;
         // Unpack the data and set the limb parameters.
         limbKinParam = setHumanLimbKinParams(serReader.payload, 1);
+        _cmdSet = 0x01;
         break;
       case CALIBRATE:
         // This can be set only if there is no error.
@@ -302,20 +330,28 @@ void readHandleIncomingMessage() {
         angle3.write(0);
         angle4.write(0);
         calib = YESCALIB;
+        _cmdSet = 0x01;
         break;
       case GET_VERSION:
         stream = false;
         // Send the current firmware version.
         sendVersionDetails();
+        _cmdSet = 0x02;
         break;
       case HEARTBEAT:
         lastRxdHeartbeat = millis();
+        _cmdSet = 0x02;
         break;
       case RESET_PACKETNO:
         packetNumber.num = 0;
         startTime = millis();
         runTime.num = 0;
+        _cmdSet = 0x01;
         break;
+    }
+    // Update command status
+    if (_cmdSet != 0x02) {
+      cmdStatus = (_cmdSet == 0x01) ? COMMAND_SUCCESS : COMMAND_FAIL;
     }
     serReader.payloadHandled();
   }
@@ -387,6 +423,29 @@ bool isValidLimb(byte limbval) {
     (limbval == LEFT)
   );
 }
+
+// Parse the toque/position target details.
+void parseTargetDetails(byte* payload, int strtInx, float *out) {
+  int inx = strtInx;
+  floatunion_t temp;
+  // The are four floats: start position, start time, target, duration.
+  // Initial position
+  _assignFloatUnionBytes(inx, payload, &temp);
+  out[0] = temp.num;
+  // Initial time
+  inx += 4;
+  _assignFloatUnionBytes(inx, payload, &temp);
+  out[1] = min(0, temp.num);
+  // Target
+  inx += 4;
+  _assignFloatUnionBytes(inx, payload, &temp);
+  out[2] = temp.num;
+  // Duration
+  inx += 4;
+  _assignFloatUnionBytes(inx, payload, &temp);
+  out[3] = max(MIN_TARGET_DUR, temp.num);
+}
+
 
 
 // void readHandleIncomingMessage() {

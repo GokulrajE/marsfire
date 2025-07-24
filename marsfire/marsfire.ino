@@ -64,6 +64,9 @@ void loop() {
   // Update control
   updateControlLaw();
 
+  // Send data out.
+  writeSensorStream();
+
   // // Relax. You only need to work at around 200Hz
   // delay(2);
   packetNumber.num += 1;
@@ -71,6 +74,9 @@ void loop() {
   runTime.num = currMilliCount - startTime;
   delTime = (currMilliCount - prevMilliCount) / 1000.0;
   prevMilliCount = currMilliCount;
+
+  // Update safety timers.
+  updateSafetyTimers();
 
   // n = n + 1.0;
 
@@ -84,7 +90,7 @@ void loop() {
   //  controller();
    //Serial.println("4");
 
-   writeSensorStream();
+   
    //Serial.println("5");
   //  readHandleIncomingMessage();
 

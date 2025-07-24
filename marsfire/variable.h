@@ -90,15 +90,29 @@
 #define MAXDELPWM             40      // Changed from 5
 #define MAX_CURRENT           10
 #define POS_CTRL_DBAND        0
+#define POSITION_TARGET_MIN   -120    // Degrees
+#define POSITION_TARGET_MAX   0       // Degrees
+#define TORQUE_TARGET_MIN     -20     // Nm
+#define TORQUE_TARGET_MAX     10      // Nm
+#define POSITION_RATE_LIMIT   10      // Degrees / sec
+#define TORQUE_RATE_LIMIT     1       // Nm / sec
 
 // Error types 
 #define ANGSENSERR            0x0001
 #define MCURRSENSERR          0x0002
 #define NOHEARTBEAT           0x0004
 
+// Safety timer thresholds
+#define TARGET_SET_BACKOUT    2.0     // sec
+
 // Kinematic calib status
 #define NOCALIB               0x00
 #define YESCALIB              0x01
+
+// Recent command status
+#define COMMAND_NONE          0x00
+#define COMMAND_SUCCESS       0x01
+#define COMMAND_FAIL          0x02
 
 // Limb parameter status
 #define NOLIMBKINPARAM        0x00
@@ -169,6 +183,7 @@ float lastRxdHeartbeat = 0.0f;
 
 // Program status
 byte streamType = SENSORSTREAM;
+byte cmdStatus = COMMAND_NONE;
 bool stream = true;
 byte ctrlType = NONE;
 byte calib = NOCALIB;
@@ -228,6 +243,11 @@ int8_t imu1Byte, imu2Byte, imu3Byte, imu4Byte;
 // Endpoint kinematics of the robot.
 float xEp, yEp, zEp;
 
+// Endpoint force.
+float epForce;
+float torque, torquePrev;
+float dTorque;
+
 // Human limb parameters and their codes.
 float uaLength, faLength;
 uint8_t uaLByte, faLByte;
@@ -248,6 +268,19 @@ float marsGCTorque;
 // Desired target related variables.
 float strtPos, strtTime, initTime, tgtDur; 
 
+// Temporary variable for parsing incoming data.
+float tempArray[8];
+
+
+// Safety Timers.
+int safetyTimerTargetSetBlackout = -1;
+
+
+
+
+
+
+// Old variables.
 float th1, th2, th3, th4;
 float upperArm, foreArm;
 float shx, shy, shz;

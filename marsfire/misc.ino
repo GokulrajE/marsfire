@@ -1,33 +1,4 @@
 
-/*
- * Check if there is heartbeat.
- */
-void checkHeartbeat() {
-  // Check if a heartbeat was recently received.
-  if (0.001 * (millis() - lastRxdHeartbeat) < MAX_HBEAT_INTERVAL) {
-    // Everything is good. No heart beat related error.
-    deviceError.num &= ~NOHEARTBEAT;
-  } else {
-    // No heartbeat received.
-    // Setting error flag.
-    deviceError.num |= NOHEARTBEAT;
-  }
-}
-
-/*
- * Handles errors
- */
-void handleErrors() {
-  if (deviceError.num != 0) {
-    // #if SERIALUSB_DEBUG
-    //   SerialUSB.print("Error occured: ");
-    //   SerialUSB.print(deviceError.num);
-    //   SerialUSB.print("\n");
-    // #endif
-    setControlType(NONE);
-  }
-}
-
 void _assignFloatUnionBytes(int inx, byte* bytes, floatunion_t* temp) {
   temp->bytes[0] = bytes[inx];
   temp->bytes[1] = bytes[inx + 1];
@@ -78,9 +49,9 @@ void deviceSetUp() {
 void updateSensorData() {
   // 1. Read the force sensors.
   scale1.update();
-  force1 = -scale1.getData();
-  scale2.update();
-  force2 = scale2.getData();
+  epForce = -scale1.getData();
+  // scale2.update();
+  // force2 = scale2.getData();
 
   // 2. Read the encoder data.
   // Update previous values.
@@ -130,6 +101,11 @@ void updateSensorData() {
 
   // 6. Compute the human limb joint angles. 
 
+
+  // 7. Update the current torque and rate of change of torque.
+  torque = epForce * sqrt(xEp * xEp + yEp * yEp) / 1000;
+  dTorque = (torque - torquePrev) / delTime;
+  torquePrev = torque;
 }
 
 
@@ -158,8 +134,8 @@ byte getProgramStatus(byte dtype) {
 
 
 byte getAdditionalInfo(void) {
-  // X | X | CALIB | MARS | LIMBDYNPARAM | LIMBKINPARAM | CURR LIMB | CURR LIMB
-  return (devButtons << 4) | (limbDynParam << 3) | (limbKinParam << 2) | currLimb;
+  // CMD_STATUS | CMD_STATUS | CALIB | MARS | LIMBDYNPARAM | LIMBKINPARAM | CURR LIMB | CURR LIMB
+  return (cmdStatus << 6) | (devButtons << 4) | (limbDynParam << 3) | (limbKinParam << 2) | currLimb;
 }
 
 void setLimb(byte limb) {
@@ -178,6 +154,7 @@ bool isWithinRange(float val, float minVal, float maxVal) {
   else if (val  > maxVal) return false;
   return true; 
 }
+
 
 // void readMarsButtonState(void) {
 //    button.update();                  // Update the Bounce instance
@@ -318,26 +295,3 @@ void updateCalibButton() {
   calibButtonState = 1.0 * digitalRead(CALIB_BUTTON);
   // Serial.println(digitalRead(calib_button_pin));
 }
-
-// Set toque/position target
-void setTarget(byte* payload, int strtInx) {
-  int inx = strtInx;
-  floatunion_t temp;
-  // The are four floats: start position, start time, target, duration.
-  // Initial position
-  _assignFloatUnionBytes(inx, payload, &temp);
-  strtPos = temp.num;
-  // Initial time
-  inx += 4;
-  _assignFloatUnionBytes(inx, payload, &temp);
-  strtTime = min(0, temp.num);
-  // Target
-  inx += 4;
-  _assignFloatUnionBytes(inx, payload, &temp);
-  target = temp.num;
-  // Duration
-  inx += 4;
-  _assignFloatUnionBytes(inx, payload, &temp);
-  tgtDur = max(MIN_TARGET_DUR, temp.num);
-}
-

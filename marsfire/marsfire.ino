@@ -75,9 +75,6 @@ void loop() {
   delTime = (currMilliCount - prevMilliCount) / 1000.0;
   prevMilliCount = currMilliCount;
 
-  // Update safety timers.
-  updateSafetyTimers();
-
   // n = n + 1.0;
 
   //  updateCalibButton();

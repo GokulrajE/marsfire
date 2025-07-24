@@ -151,9 +151,7 @@ void readHandleIncomingMessage() {
         break;
       case SET_CONTROL_TARGET:
         // Make sure that a minimum amount of time has passed since the previous target set.
-        if (safetyTimerTargetSetBlackout * delTime < TARGET_SET_BACKOUT) break;
-        // Reset the timer.
-        safetyTimerTargetSetBlackout = -1;
+        if ((runTime.num - targetSetTime) < TARGET_SET_BACKOUT) break;
         // This can be set only if there is not error.
         if (deviceError.num != 0) break;
         // Ensure that the position or torque is not changing too rapidly.
@@ -177,8 +175,8 @@ void readHandleIncomingMessage() {
           tgtDur = tempArray[3];
           // Initial time.
           initTime = runTime.num / 1000.0f + strtTime;
-          // Set the timer.
-          safetyTimerTargetSetBlackout = 0;
+          // Set the current target set time.
+          targetSetTime = runTime.num;
           _cmdSet = 0x01;
         }
         break;

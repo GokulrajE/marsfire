@@ -27,11 +27,3 @@ void handleErrors() {
     setControlType(NONE);
   }
 }
-
-/*
- * Update the safety timers.
- */
-void updateSafetyTimers() {
-  // Target set blackout timer.
-  if (safetyTimerTargetSetBlackout >= 0) safetyTimerTargetSetBlackout++;
-}

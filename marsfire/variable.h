@@ -94,8 +94,8 @@
 #define POSITION_TARGET_MAX   0       // Degrees
 #define TORQUE_TARGET_MIN     -20     // Nm
 #define TORQUE_TARGET_MAX     10      // Nm
-#define POSITION_RATE_LIMIT   10      // Degrees / sec
-#define TORQUE_RATE_LIMIT     1       // Nm / sec
+#define POSITION_RATE_LIMIT   5       // Degrees / sec
+#define TORQUE_RATE_LIMIT     0.25    // Nm / sec
 
 // Error types 
 #define ANGSENSERR            0x0001
@@ -103,7 +103,7 @@
 #define NOHEARTBEAT           0x0004
 
 // Safety timer thresholds
-#define TARGET_SET_BACKOUT    2.0     // sec
+#define TARGET_SET_BACKOUT    2000     // millisec
 
 // Kinematic calib status
 #define NOCALIB               0x00
@@ -272,8 +272,8 @@ float strtPos, strtTime, initTime, tgtDur;
 float tempArray[8];
 
 
-// Safety Timers.
-int safetyTimerTargetSetBlackout = -1;
+// Safety Time Flags.
+unsigned long targetSetTime;
 
 
 

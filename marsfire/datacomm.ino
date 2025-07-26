@@ -4,112 +4,6 @@
 //#include "CustomDS.h"
 
 
-
-void writeSensorStream()
-{
-  // Format:
-  // 255 | 255 | No. of bytes | Status | Error Val 1 | Error Val 2 | ...
-  // Payload | Chksum
-  byte header[] = {0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00 };
-  byte chksum = 0xFE;
-  byte _temp;
-
-  //Out data buffer
-  outPayload.newPacket();
-  outPayload.add(theta1);
-  outPayload.add(theta2);
-  outPayload.add(theta3);
-  outPayload.add(theta4);
-  outPayload.add(epForce);
-  outPayload.add(xEp);
-  outPayload.add(yEp);
-  outPayload.add(zEp);
-  outPayload.add(target);
-  outPayload.add(desired.val(0));
-  outPayload.add(control.val(0));
-
-  // Add additional data if in DIAGNOSTICS mode
-  if (streamType == DIAGNOSTICS) {
-    outPayload.add(err);
-    outPayload.add(errdiff);
-    outPayload.add(errsum);
-    outPayload.add(marsGCTorque);
-    outPayload.add(omega1);
-    outPayload.add(dTorque);
-  }
-
-  // Send packet.
-  header[2] = (4                      // Four headers
-               + 2                    // Packet number int16
-               + 4                    // Run time
-               + outPayload.sz() * 4  // Float sensor data
-               + 2                    // Limb lengths
-               + 2                    // Limb weights
-               + 1                    // Shoulder position
-               + 4                    // IMU angles
-               + 1                    // Checksum
-               );
-  header[3] = getProgramStatus(streamType);
-  header[4] = deviceError.bytes[0];
-  header[5] = deviceError.bytes[1];
-  header[6] = getAdditionalInfo();
-  chksum += header[2] + header[3] + header[4] + header[5] + header[6];
-
-  //Send header
-  bt.write(header[0]);
-  bt.write(header[1]);
-  bt.write(header[2]);
-  bt.write(header[3]);
-  bt.write(header[4]);
-  bt.write(header[5]);
-  bt.write(header[6]);
-  
-  // Send packet number
-  for (int i = 0; i < 2; i++) {
-    bt.write(packetNumber.bytes[i]);
-    chksum += packetNumber.bytes[i];
-  }
-
-  // Send current run time
-  for (int i = 0; i < 4; i++) {
-    bt.write(runTime.bytes[i]);
-    chksum += runTime.bytes[i];
-  }
-
-  // Send the floats
-  for (int i = 0; i < outPayload.sz() * 4; i++) {
-    _temp = outPayload.getByte(i);
-    bt.write(_temp);
-    chksum += _temp;
-  }
-
-  // Send the human limb parameters
-  bt.write(uaLByte);
-  chksum += uaLByte;
-  bt.write(faLByte);
-  chksum += faLByte;
-  bt.write(uaWByte);
-  chksum += uaWByte;
-  bt.write(faWByte);
-  chksum += faWByte;
-  bt.write(shZByte);
-  chksum += shZByte;
-
-  // Send the IMU angles
-  bt.write(imu1Byte);
-  chksum += imu1Byte;
-  bt.write(imu2Byte);
-  chksum += imu2Byte;
-  bt.write(imu3Byte);
-  chksum += imu3Byte;
-  bt.write(imu4Byte);
-  chksum += imu4Byte;
-
-  bt.write(chksum);
-  bt.flush();
-}
-
-
 // Read and handle incoming messages.
 // Many commands will be ignored if there is a device error.
 void readHandleIncomingMessage() {
@@ -122,6 +16,7 @@ void readHandleIncomingMessage() {
     _details = serReader.payload[1];
     // Handle new message.
     // Check the command type.
+    if (serReader.payload[0] != 0x80) SerialUSB.println(serReader.payload[0]);
     switch (serReader.payload[0]) {
       case START_STREAM:
         stream = true;
@@ -288,14 +183,30 @@ void readHandleIncomingMessage() {
       case SET_LIMB_KIN_PARAM:
         // This can be set only if there is no error.
         if (deviceError.num != 0) break;
+        SerialUSB.print(" 1");
         // This can only be set if the control is NONE.
         if (ctrlType != NONE) break;
+        SerialUSB.print(" 2");
         // Check if the limb has been set.
         if (currLimb == NOLIMB) break;
+        SerialUSB.print(" 3");
         // This can only be set if the robot has been calibrated.
         if (calib == NOCALIB) break;
+        SerialUSB.print(" 4");
         // Unpack the data and set the limb parameters.
+        SerialUSB.print(" = All checks done.\n");
         limbKinParam = setHumanLimbKinParams(serReader.payload, 1);
+        SerialUSB.print("Lim Kin Param Status: ");
+        SerialUSB.print(limbKinParam);
+        SerialUSB.print("\n");
+        if (limbKinParam == YESLIMBKINPARAM) _cmdSet = 0x01;
+        break;
+      case GET_LIMB_KIN_PARAM:
+        sendHumanLinbKinParam();
+        _cmdSet = 0x01;
+        break;
+      case RESET_LIMB_KIN_PARAM:
+        limbKinParam = NOLIMBKINPARAM;
         _cmdSet = 0x01;
         break;
       case CALIBRATE:
@@ -318,9 +229,10 @@ void readHandleIncomingMessage() {
             (imuTheta3 > CALIB_IMU_ANGLE_MAX) || 
             (imuTheta4 > CALIB_IMU_ANGLE_MAX)) break;
         // Set the offset angles.
-        theta1Offset = imuTheta1;
-        theta2Offset = imuTheta2;
-        theta3Offset = imuTheta3;
+        theta1Offset = currLimb == RIGHT ? imuTheta1 : -imuTheta1;
+        theta2Offset = currLimb == RIGHT ? imuTheta2 : -imuTheta2;;
+        theta3Offset = currLimb == RIGHT ? imuTheta3 : -imuTheta3;;
+        // theta4Offset = currLimb == RIGHT ? imuTheta4 : -imuTheta4;;
         theta4Offset = imuTheta4;
         // Reset encoder counts.
         angle1.write(0);
@@ -353,6 +265,96 @@ void readHandleIncomingMessage() {
     }
     serReader.payloadHandled();
   }
+}
+
+
+void writeSensorStream()
+{
+  // Format:
+  // 255 | 255 | No. of bytes | Status | Error Val 1 | Error Val 2 | ...
+  // Payload | Chksum
+  byte header[] = {0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00 };
+  byte chksum = 0xFE;
+  byte _temp;
+
+  //Out data buffer
+  outPayload.newPacket();
+  outPayload.add(theta1);
+  outPayload.add(theta2);
+  outPayload.add(theta3);
+  outPayload.add(theta4);
+  outPayload.add(epForce);
+  outPayload.add(xEp);
+  outPayload.add(yEp);
+  outPayload.add(zEp);
+  outPayload.add(target);
+  outPayload.add(desired.val(0));
+  outPayload.add(control.val(0));
+
+  // Add additional data if in DIAGNOSTICS mode
+  if (streamType == DIAGNOSTICS) {
+    outPayload.add(err);
+    outPayload.add(errdiff);
+    outPayload.add(errsum);
+    outPayload.add(marsGCTorque);
+    outPayload.add(omega1);
+    outPayload.add(dTorque);
+  }
+
+  // Send packet.
+  header[2] = (4                      // Four headers
+               + 2                    // Packet number int16
+               + 4                    // Run time
+               + outPayload.sz() * 4  // Float sensor data
+               + 4                    // IMU angles
+               + 1                    // Checksum
+               );
+  header[3] = getProgramStatus(streamType);
+  header[4] = deviceError.bytes[0];
+  header[5] = deviceError.bytes[1];
+  header[6] = getAdditionalInfo();
+  chksum += header[2] + header[3] + header[4] + header[5] + header[6];
+
+  //Send header
+  bt.write(header[0]);
+  bt.write(header[1]);
+  bt.write(header[2]);
+  bt.write(header[3]);
+  bt.write(header[4]);
+  bt.write(header[5]);
+  bt.write(header[6]);
+  
+  // Send packet number
+  for (int i = 0; i < 2; i++) {
+    bt.write(packetNumber.bytes[i]);
+    chksum += packetNumber.bytes[i];
+  }
+
+  // Send current run time
+  for (int i = 0; i < 4; i++) {
+    bt.write(runTime.bytes[i]);
+    chksum += runTime.bytes[i];
+  }
+
+  // Send the floats
+  for (int i = 0; i < outPayload.sz() * 4; i++) {
+    _temp = outPayload.getByte(i);
+    bt.write(_temp);
+    chksum += _temp;
+  }
+
+  // Send the IMU angles
+  bt.write(imu1Byte);
+  chksum += imu1Byte;
+  bt.write(imu2Byte);
+  chksum += imu2Byte;
+  bt.write(imu3Byte);
+  chksum += imu3Byte;
+  bt.write(imu4Byte);
+  chksum += imu4Byte;
+
+  bt.write(chksum);
+  bt.flush();
 }
 
 
@@ -407,6 +409,52 @@ void sendVersionDetails() {
     chksum += compileDate[i];
   }
   // Send Checksum
+  bt.write(chksum);
+  bt.flush();
+}
+
+
+void sendHumanLinbKinParam() {
+  // Format:
+  // 255 | 255 | No. of bytes | Status | Error Val 1 | Error Val 2 | ...
+  // Payload | Chksum
+  byte header[] = {0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00 };
+  byte chksum = 0xFE;
+  byte _temp;
+
+  //Out data buffer
+  outPayload.newPacket();
+  outPayload.add(uaLength);
+  outPayload.add(faLength);
+  outPayload.add(shPosZ);
+
+  // Send packet.
+  header[2] = (4                      // Four headers
+               + outPayload.sz() * 4  // Limb Kin param
+               + 1                    // Checksum
+               );
+  header[3] = getProgramStatus(HLIMKINPARAM);
+  header[4] = deviceError.bytes[0];
+  header[5] = deviceError.bytes[1];
+  header[6] = getAdditionalInfo();
+  chksum += header[2] + header[3] + header[4] + header[5] + header[6];
+
+  //Send header
+  bt.write(header[0]);
+  bt.write(header[1]);
+  bt.write(header[2]);
+  bt.write(header[3]);
+  bt.write(header[4]);
+  bt.write(header[5]);
+  bt.write(header[6]);
+  
+  // Send the floats
+  for (int i = 0; i < outPayload.sz() * 4; i++) {
+    _temp = outPayload.getByte(i);
+    bt.write(_temp);
+    chksum += _temp;
+  }
+
   bt.write(chksum);
   bt.flush();
 }

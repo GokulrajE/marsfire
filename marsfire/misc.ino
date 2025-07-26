@@ -8,10 +8,10 @@ void _assignFloatUnionBytes(int inx, byte* bytes, floatunion_t* temp) {
 
 // Initial hardware set up the device.
 void deviceSetUp() {
-  // 1. Calibration Button
-  calibBounce.attach(CALIB_BUTTON);
-  calibBounce.interval(5);
-
+  // 1. Calibration and MARS Buttons
+  pinMode(CALIB_BUTTON, INPUT_PULLUP);
+  pinMode(MARS_BUTTON, INPUT_PULLUP);
+  
   // 2. Set up all encoders.
   pinMode(ENC1A, INPUT_PULLUP);
   pinMode(ENC1B, INPUT_PULLUP);
@@ -37,10 +37,6 @@ void deviceSetUp() {
 
   // 5. IMU setup
   imuSetup();
-
-  // 6. MARS button
-  marsBounce.attach(MARS_BUTTON);
-  marsBounce.interval(5);
 }
 
 /*
@@ -87,10 +83,8 @@ void updateSensorData() {
   omega4 = (theta4 - theta4Prev) / delTime;
 
   // 3. Read buttons.
-  marsBounce.update();
-  marsButton = marsBounce.read();
-  calibBounce.update();
-  calibButton = calibBounce.read();
+  marsButton = updatButtonPressValue(MARS_BUTTON, &marsBounceCount, marsButton);
+  calibButton = updatButtonPressValue(CALIB_BUTTON, &calibBounceCount, calibButton);
   devButtons = (calibButton << 1) | marsButton;
 
   // 4. Read IMU data.
@@ -153,6 +147,24 @@ bool isWithinRange(float val, float minVal, float maxVal) {
   if (val < minVal) return false;
   else if (val  > maxVal) return false;
   return true; 
+}
+
+byte updatButtonPressValue(byte pinNo, int8_t* bounceCount, byte buttonValue) {
+  byte _btnval = digitalRead(pinNo);
+  // Change in button state.
+  if (buttonValue == _btnval) return buttonValue;
+  // Change in state.
+  if (_btnval == 0) {
+    if (*bounceCount >= 0) *bounceCount = -1;
+    else (*bounceCount)--;
+  } else {
+    if (*bounceCount <= 0) *bounceCount = 1;
+    else (*bounceCount)++;
+  }
+  // Check if bounceCount has crossed the threshold.
+  if (*bounceCount <= -BOUNCE_THRESHOLD) return 0;
+  else if (*bounceCount >= BOUNCE_THRESHOLD) return 1;
+  else return buttonValue;
 }
 
 

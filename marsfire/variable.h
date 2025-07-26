@@ -10,7 +10,6 @@
 #include "SerialReader.h"
 #include "SoftwareSerial.h"
 #include "HX711_ADC.h"
-#include <Bounce2.h>
 #include "Wire.h"
 #include <MPU6050_light.h>
 
@@ -65,7 +64,9 @@
 #define SENSORSTREAM          0x00
 #define CONTROLPARAM          0x01
 #define DIAGNOSTICS           0x02
-#define VERSION               0x03
+#define HLIMKINPARAM          0x03
+#define HLIMDYNPARAM          0x04
+#define VERSION               0x05
 
 // In data type
 #define GET_VERSION           0x00
@@ -79,6 +80,10 @@
 #define SET_DIAGNOSTICS       0x08
 #define SET_LIMB_KIN_PARAM    0x09
 #define SET_LIMB_DYN_PARAM    0x0A
+#define GET_LIMB_KIN_PARAM    0x0B
+#define GET_LIMB_DYN_PARAM    0x0C
+#define RESET_LIMB_KIN_PARAM  0x0D
+#define RESET_LIMB_DYN_PARAM  0x0E
 #define HEARTBEAT             0x80
 
 // Control Law Related Definitions
@@ -114,6 +119,9 @@
 #define COMMAND_SUCCESS       0x01
 #define COMMAND_FAIL          0x02
 
+// Button bounce threshold
+#define BOUNCE_THRESHOLD      5
+
 // Limb parameter status
 #define NOLIMBKINPARAM        0x00
 #define YESLIMBKINPARAM       0x01
@@ -139,20 +147,20 @@
 #define L2                    291     // millimeters
 
 // Human limb parameter ranges
-#define MIN_UA_LENGTH         200     // millimeters
-#define MAX_UA_LENGTH         400     // millimeters
-#define MIN_FA_LENGTH         200     // millimeters
-#define MAX_FA_LENGTH         500     // millimeters
+#define MIN_UA_LENGTH         0.2     // millimeters
+#define MAX_UA_LENGTH         0.4     // millimeters
+#define MIN_FA_LENGTH         0.2     // millimeters
+#define MAX_FA_LENGTH         0.5     // millimeters
 #define MIN_UA_WEIGHT         1.0     // Kg
 #define MAX_UA_WEIGHT         5.0     // Kg
 #define MIN_FA_WEIGHT         1.0     // Kg
 #define MAX_FA_WEIGHT         5.0     // Kg
-#define MIN_SHLDR_X_POS       -150    // millimeters
-#define MAX_SHLDR_X_POS       +150    // millimeters
-#define MIN_SHLDR_Y_POS       -150    // millimeters
-#define MAX_SHLDR_Y_POS       +150    // millimeters
-#define MIN_SHLDR_Z_POS       100     // millimeters
-#define MAX_SHLDR_Z_POS       500     // millimeters
+#define MIN_SHLDR_X_POS       -0.15   // millimeters
+#define MAX_SHLDR_X_POS       +0.15   // millimeters
+#define MIN_SHLDR_Y_POS       -0.15   // millimeters
+#define MAX_SHLDR_Y_POS       +0.15   // millimeters
+#define MIN_SHLDR_Z_POS       0.1     // millimeters
+#define MAX_SHLDR_Z_POS       0.5     // millimeters
 
 // Heart beat related variable
 #define MAX_HBEAT_INTERVAL    2.0 // Seconds
@@ -204,6 +212,13 @@ float delTime;
 // Current limb
 byte currLimb;
 
+// MARS and Calibration buttons states.
+int8_t marsBounceCount = 0;
+byte marsButton = 0;
+int8_t calibBounceCount = 0;
+byte calibButton = 0;
+byte devButtons = 0;
+
 // Control related variables.
 float target;
 Buffer actual;
@@ -250,11 +265,11 @@ float dTorque;
 
 // Human limb parameters and their codes.
 float uaLength, faLength;
-uint8_t uaLByte, faLByte;
+// uint8_t uaLByte, faLByte;
 float shPosZ;
-uint8_t shZByte;
+// uint8_t shZByte;
 float uaWeight, faWeight;
-uint8_t uaWByte, faWByte;
+// uint8_t uaWByte, faWByte;
 
 // Controller gains
 float pcKp = 1.5;
@@ -310,12 +325,7 @@ float calibButtonState;
 //#define ENC5MAXCOUNT    4*1024
 //#define ENC5COUNT2DEG   0.25f*0.351625f
 
-// MARS nad Calibration buttons states.
-volatile byte marsButton = 0;
-volatile byte calibButton = 0;
-volatile byte devButtons = 0;
-Bounce marsBounce = Bounce();
-Bounce calibBounce = Bounce();
+
 
 
 //Encoder angle5(ENC5A, ENC5B);

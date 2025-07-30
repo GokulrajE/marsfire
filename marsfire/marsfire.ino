@@ -22,7 +22,7 @@ void setup() {
   setLimb(NOLIMB);
 
   // Device button settiongs
-  readStream.begin(readHandleIncomingMessage, 1000);
+  readStream.begin(readHandleIncomingMessage, 100);
 
   // Set targets to invalid value 999.
   target = INVALID_TARGET;
@@ -56,12 +56,7 @@ void loop() {
 
   // Handle errors.
   handleErrors();
-
-  // // Send sensordata
-  // if (stream) {
-  //   writeSensorStream();
-  // }
-
+  
   // Update control
   updateControlLaw();
 

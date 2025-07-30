@@ -21,6 +21,7 @@
 #define MOTOR_ENABLE          38
 #define MOTOR_DIR             39
 #define MOTOR_T2I             3.35  // A / Nm
+#define MOTOR_TORQ_CONST      3.7153  // Nm / A
 // int PWMpin_theta1 = 37;
 // int enablepin_theta1 = 38;
 // int directionpin_theta1 = 39;
@@ -48,6 +49,7 @@
 #define LOADCELL2_DOUT_PIN    16//17
 #define LOADCELL2_SCK_PIN     17//18
 #define LOACELL_CALIB_FACTOR  12866.6
+#define ARM_REST_WEIGHT       1.46    // New
 
 // Limb type
 #define NOLIMB                0x00
@@ -58,7 +60,7 @@
 #define NONE                  0x00
 #define POSITION              0x01
 #define TORQUE                0x02
-#define ARM_WEIGHT_SUPPORT    0x03
+#define AWS                   0x03
 
 // Out data type
 #define SENSORSTREAM          0x00
@@ -89,6 +91,8 @@
 // Control Law Related Definitions
 #define INVALID_TARGET        999.0
 #define INTEGRATOR_LIMIT      4.0
+#define POS_ERROR_CAP         10.0    // Degrees
+#define POS_ERROR_DIFF_CAP    2.0     // Degrees
 #define PWMRESOLN             12      // This has been changed from 8. Suggestions from Aravind.
 #define MINPWM                410     // 10% of 4095
 #define MAXPWM                3686    // 90% of 4095
@@ -97,10 +101,16 @@
 #define POS_CTRL_DBAND        0
 #define POSITION_TARGET_MIN   -120    // Degrees
 #define POSITION_TARGET_MAX   0       // Degrees
+#define TORQUE_CTRL_DBAND     0
 #define TORQUE_TARGET_MIN     -20     // Nm
-#define TORQUE_TARGET_MAX     10      // Nm
+#define TORQUE_TARGET_MAX     20      // Nm
 #define POSITION_RATE_LIMIT   5       // Degrees / sec
 #define TORQUE_RATE_LIMIT     0.25    // Nm / sec
+#define TORQTGT_SIG_MA_MID    0.3     // m       
+#define TORQTGT_SIG_MA_SPRD   0.1     // m
+#define TORQTGT_SIG_FLX_MID   -120    // Degrees       
+#define TORQTGT_SIG_FLX_SPRD  10      // Degrees
+
 
 // Error types 
 #define ANGSENSERR            0x0001
@@ -143,24 +153,24 @@
 #define MIN_TARGET_DUR        2.0     // Seconds
 
 // MARS robot parameters.
-#define L1                    475     // millimeters
-#define L2                    291     // millimeters
+#define L1                    0.475   // meters
+#define L2                    0.291   // meters
 
 // Human limb parameter ranges
-#define MIN_UA_LENGTH         0.2     // millimeters
-#define MAX_UA_LENGTH         0.4     // millimeters
-#define MIN_FA_LENGTH         0.2     // millimeters
-#define MAX_FA_LENGTH         0.5     // millimeters
-#define MIN_UA_WEIGHT         1.0     // Kg
-#define MAX_UA_WEIGHT         5.0     // Kg
-#define MIN_FA_WEIGHT         1.0     // Kg
-#define MAX_FA_WEIGHT         5.0     // Kg
-#define MIN_SHLDR_X_POS       -0.15   // millimeters
-#define MAX_SHLDR_X_POS       +0.15   // millimeters
-#define MIN_SHLDR_Y_POS       -0.15   // millimeters
-#define MAX_SHLDR_Y_POS       +0.15   // millimeters
-#define MIN_SHLDR_Z_POS       0.1     // millimeters
-#define MAX_SHLDR_Z_POS       0.5     // millimeters
+#define MIN_UA_LENGTH         0.150   // meters
+#define MAX_UA_LENGTH         0.400   // meters
+#define MIN_FA_LENGTH         0.100   // meters
+#define MAX_FA_LENGTH         0.300   // meters
+#define MIN_UA_WEIGHT         1.000   // Kg
+#define MAX_UA_WEIGHT         5.000   // Kg
+#define MIN_FA_WEIGHT         1.000   // Kg
+#define MAX_FA_WEIGHT         5.000   // Kg
+#define MIN_SHLDR_X_POS       -0.15   // meters
+#define MAX_SHLDR_X_POS       +0.15   // meters
+#define MIN_SHLDR_Y_POS       -0.15   // meters
+#define MAX_SHLDR_Y_POS       +0.15   // meters
+#define MIN_SHLDR_Z_POS       0.100   // meters
+#define MAX_SHLDR_Z_POS       0.500   // meters
 
 // Heart beat related variable
 #define MAX_HBEAT_INTERVAL    2.0 // Seconds
@@ -168,6 +178,9 @@
 // Radians to degree conversion
 #define RAD2DEG(x)            180.0 * x / 3.141592
 #define DEG2RAD(x)            3.141592 * x / 180.0
+
+// Sigmoid function
+#define SIGMOID(x)            1 / (1 + exp(-5 * x))
 
 // Version and device ID.
 const char* fwVersion = "25.07";
@@ -257,6 +270,7 @@ int8_t imu1Byte, imu2Byte, imu3Byte, imu4Byte;
 
 // Endpoint kinematics of the robot.
 float xEp, yEp, zEp;
+float momentArm;
 
 // Endpoint force.
 float epForce;
@@ -265,16 +279,22 @@ float dTorque;
 
 // Human limb parameters and their codes.
 float uaLength, faLength;
+// Square of the limb lengths which will be used for inverse kinematics.
+float uaL2, faL2, uafaL;
 // uint8_t uaLByte, faLByte;
 float shPosZ;
 // uint8_t shZByte;
 float uaWeight, faWeight;
-// uint8_t uaWByte, faWByte;
+// Human joint angles.
+float phi1, phi2, phi3;
 
 // Controller gains
 float pcKp = 1.5;
 float pcKd = 7.8;
 float pcKi = 0;
+float tcKp = 0.5;
+float tcKd = 0.7;
+float tcKi = 0.1;
 // Control related buffers
 float err;
 float errdiff;
@@ -286,13 +306,8 @@ float strtPos, strtTime, initTime, tgtDur;
 // Temporary variable for parsing incoming data.
 float tempArray[8];
 
-
 // Safety Time Flags.
 unsigned long targetSetTime;
-
-
-
-
 
 
 // Old variables.
@@ -305,7 +320,7 @@ float zvec1, zvec2, zvec3;
 float elbx, elby, elbz;
 float fAx, fAy, fAz;
 float uAx, uAy, uAz;
-float phi1, phi2, phi4, dot;
+// float phi1, phi2, phi4, dot;
 float distFromZAxis;
 
 float time_ellapsed = 0;

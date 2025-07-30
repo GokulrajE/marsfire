@@ -14,42 +14,28 @@ void setControlType(byte ctype) {
   switch (ctype) {
     case NONE:
     case POSITION:
+    case TORQUE:
       // Nothing needs to be set.
       ctrlType = ctype;
-      target = INVALID_TARGET;
-      desired.add(INVALID_TARGET);
-      return;
-    case TORQUE:
+      break;
+    case AWS:
       // Upper-limb kinematic and dynamic parameters need to set.
       if ((limbKinParam == NOLIMBKINPARAM) || (limbDynParam == NOLIMBDYNPARAM)) {
         ctrlType = NONE;
       } else {
         ctrlType = ctype;
-        target = 0.0;
-        desired.add(0.0);
       }
-      return;
+      break;
   }
+  target = INVALID_TARGET;
+  desired.add(INVALID_TARGET);
 }
 
 void updateControlLaw() {
-  // float _currPWM = 0.0;
-  // float _currError = 0.0;
   float _currI = 0.0;
   float _currPWM = 0.0;
   float _prevPWM = control.val(0);
   bool _motorEnabled = true;
-  float _alpha;
-  // float ffCurr = 0.0;
-  // float ffPWM = 0.0;
-  // float _delPWMSign;
-  // If control is NONE. Switch off control and move on.
-  // if (ctrlType == NONE) {
-  //   // Switch off controller.
-  //   digitalWrite(ENABLE, LOW);
-  //   control.add(0.0);
-  //   return;
-  // }
   // Else we need to take the appropriate action.
   switch (ctrlType) {
     case NONE:
@@ -66,13 +52,29 @@ void updateControlLaw() {
       break;
     case POSITION:
       // Update desired position
-      desired.add(getDesiredValue());
+      desired.add(getDesiredPositionValue());
       // Position control.
       _currI = limbControlScale * controlPosition();
       // Add the MARS gravity compensation torque
       marsGCTorque = MARS_GRAV_COMP_ADJUST * limbControlScale * getMarsGravityCompensationTorque() / MOTOR_T2I;
       _currI += marsGCTorque;
-      _currPWM = boundPositionControl(convertCurrentToPWM(_currI));
+      _currPWM = convertCurrentToPWM(_currI);
+      break;
+    case TORQUE:
+      // Updat desired position
+      float _torqtgt = getDesiredTorqueValue();
+      // Scale target down based on moment arm and robot's flexion angle.
+      float _scaleMA = SIGMOID((momentArm - TORQTGT_SIG_MA_MID) / TORQTGT_SIG_MA_SPRD);
+      float _scaleShFlex = SIGMOID((theta1 - TORQTGT_SIG_FLX_MID) / TORQTGT_SIG_FLX_SPRD);
+      desired.add(_scaleShFlex * _scaleMA * _torqtgt);
+      // Feedforward torque.
+      _currI = - 0.5 * limbControlScale * desired.val(0);
+      // Torque PD control.
+      _currI += - limbControlScale * controlTorque();
+      // Add the MARS gravity compensation torque
+      marsGCTorque = MARS_GRAV_COMP_ADJUST * limbControlScale * getMarsGravityCompensationTorque() / MOTOR_T2I;
+      _currI += marsGCTorque;
+      _currPWM = convertCurrentToPWM(_currI);
       break;
     // case POSITIONAAN:
     //   // Check if its an invalid target
@@ -94,8 +96,8 @@ void updateControlLaw() {
       // prev_ang = _ang;
       // break;
   }
-  // Limit the rate of change of PWM
-  _currPWM = rateLimitValue(_currPWM, _prevPWM, MAXDELPWM);
+  // Dampen control.
+  _currPWM = dampenControlForSafety(_currPWM, ctrlType);
   // Clip PWM value
   _currPWM = min(MAXPWM, max(-MAXPWM, _currPWM));
   // Send PWM value to motor controller & update control.
@@ -112,7 +114,7 @@ float controlPosition() {
   float _prevang = actual.val(1);
   float _prevtgt = desired.val(1);
   float _currp, _currd, _curri;
-  float _currerr, _preverr;
+  float _currerr, _preverr, _currderr;
   float _errsum = errsum;
   
   // Check if position control is disabled, or we should have valid 
@@ -135,14 +137,67 @@ float controlPosition() {
   // Previous error
   _preverr = (_prevtgt != INVALID_TARGET) ? _prevtgt - _prevang : _currerr;
   // Derivate control term.
-  _currd = pcKd * (_currerr - _preverr);
+  _currderr = _currerr - _preverr;
+  _currd = pcKd * _currderr;
 
   // Error sum.
-  _errsum = 0.9999 * _errsum + _currerr;
-  float _intlim = INTEGRATOR_LIMIT / pcKi;
-  _errsum = min(_intlim, max(-_intlim, _errsum));
-  // Integral control term.
-  _curri = pcKi * _errsum;
+  if (pcKi == 0) _curri = 0;
+  else {
+    _errsum = 0.9999 * _errsum + _currerr;
+    float _intlim = INTEGRATOR_LIMIT / pcKi;
+    _errsum = min(_intlim, max(-_intlim, _errsum));
+    // Integral control term.
+    _curri = pcKi * _errsum;
+  }
+
+  // Log error information
+  err = _currp;
+  errdiff = _currd;
+  errsum = _currp + _currd; //_curri;
+
+  return _currp + _currd + _curri;
+}
+
+float controlTorque() {
+  float _currtorq = torque;
+  float _currtgt = desired.val(0);
+  float _prevtorq = torquePrev;
+  float _prevtgt = desired.val(1);
+  float _currp, _currd, _curri;
+  float _currerr, _preverr;
+  float _errsum = errsum;
+  
+  // // Check if position control is disabled, or we should have valid 
+  // // current and previous desired positions. 
+  if ((_currtgt == INVALID_TARGET) || (_prevtgt == INVALID_TARGET)) {
+    err = 0.0;
+    errdiff = 0.0;
+    errsum = 0.0;
+    return 0.0;
+  }
+
+  // Update error related information.
+  // Current error
+  _currerr = _currtgt - _currtorq;
+  // Ignore small errors.
+  _currerr = (abs((_currerr)) <= TORQUE_CTRL_DBAND) ? 0.0 : _currerr;
+  // Proportional control term.
+  _currp = tcKp * (_currerr);
+
+  // Previous error
+  _preverr = (_prevtgt != INVALID_TARGET) ? _prevtgt - _prevtorq : _currerr;
+  // Derivate control term.
+  _currd = tcKd * (_currerr - _preverr);
+
+  // Error sum.
+  if (tcKi == 0) _curri = 0;
+  else {
+    _errsum = 0.9999 * _errsum + _currerr;
+    float _intlim = INTEGRATOR_LIMIT / tcKi;
+    _errsum = min(_intlim, max(-_intlim, _errsum));
+    // Integral control term.
+    _curri = tcKi * _errsum;
+  }
 
   // Log error information
   err = _currp;
@@ -171,6 +226,28 @@ float rateLimitValue(float curr, float prev, float rlim) {
     return prev - rlim;
   }
   return curr;
+}
+
+// Dampen the control output if the speed is too fast.
+float dampenControlForSafety(float currPWM, byte cType) {
+  switch(cType) {
+    case NONE:
+      if  (omega1 > 10) {
+        float _vel = (omega1 - 10) / 5.0;
+        currPWM += - limbControlScale * 10 *_vel * _vel;
+      }
+      break;
+    case POSITION:
+    case TORQUE:
+      if  (abs(omega1) > 10) {
+        float _sign = omega1 > 0 ? +1 : -1;
+        float _vel = abs(omega1 - 10) / 5.0;
+        currPWM += - limbControlScale * 10 * _sign * _vel * _vel;
+      }
+      break;
+      break;
+  }
+  return currPWM;
 }
 
 // Convert current to PWM
@@ -213,12 +290,22 @@ float mjt(float t) {
   return 6.0 * pow(t, 5) - 15.0 * pow(t, 4) + 10 * pow(t, 3);
 }
 
-// Compute the desired target value.
-float getDesiredValue() {
+// Compute the desired position target value.
+float getDesiredPositionValue() {
   if (target == INVALID_TARGET) return actual.val(0);
   float _t = runTime.num / 1000.0f;
   return strtPos + (target - strtPos) * mjt((_t - initTime) / tgtDur);
 }
+
+// Compute the desired torque target value.
+float getDesiredTorqueValue() {
+  if (target == INVALID_TARGET) return 0.0;
+  float _t = runTime.num / 1000.0f;
+  return (strtPos + (target - strtPos) * mjt((_t - initTime) / tgtDur));
+}
+
+// Desired torque scaler.
+
 
 // float updateTargetPosition() {
 //   if (target == INVALID_TARGET) return actual.val(0);

@@ -176,6 +176,9 @@ void readHandleIncomingMessage() {
         if (ctrlType != NONE) break;
         // Reset calibration
         calib = NOCALIB;
+        // Reset human limb parameter set.
+        limbKinParam = NOLIMBKINPARAM;
+        limbDynParam = NOLIMBDYNPARAM;
         // Make sure the input limb is one of the valid options.
         setLimb(isValidLimb(_details) ? _details : NOLIMB);
         _cmdSet = 0x01;
@@ -183,22 +186,16 @@ void readHandleIncomingMessage() {
       case SET_LIMB_KIN_PARAM:
         // This can be set only if there is no error.
         if (deviceError.num != 0) break;
-        SerialUSB.print(" 1");
         // This can only be set if the control is NONE.
         if (ctrlType != NONE) break;
-        SerialUSB.print(" 2");
         // Check if the limb has been set.
         if (currLimb == NOLIMB) break;
-        SerialUSB.print(" 3");
         // This can only be set if the robot has been calibrated.
         if (calib == NOCALIB) break;
-        SerialUSB.print(" 4");
+        // Reset human limb dynamic parameter.
+        limbDynParam = NOLIMBDYNPARAM;
         // Unpack the data and set the limb parameters.
-        SerialUSB.print(" = All checks done.\n");
         limbKinParam = setHumanLimbKinParams(serReader.payload, 1);
-        SerialUSB.print("Lim Kin Param Status: ");
-        SerialUSB.print(limbKinParam);
-        SerialUSB.print("\n");
         if (limbKinParam == YESLIMBKINPARAM) _cmdSet = 0x01;
         break;
       case GET_LIMB_KIN_PARAM:
@@ -206,7 +203,9 @@ void readHandleIncomingMessage() {
         _cmdSet = 0x01;
         break;
       case RESET_LIMB_KIN_PARAM:
+        // Reset human limb parameter set.
         limbKinParam = NOLIMBKINPARAM;
+        limbDynParam = NOLIMBDYNPARAM;
         _cmdSet = 0x01;
         break;
       case CALIBRATE:
@@ -219,6 +218,9 @@ void readHandleIncomingMessage() {
         // Reset calibration
         // Check the calibration value
         calib = NOCALIB;
+        // Reset human limb parameter set.
+        limbKinParam = NOLIMBKINPARAM;
+        limbDynParam = NOLIMBDYNPARAM;
         // Ensure that the IMU angles are not too off.
         if ((imuTheta1 < CALIB_IMU_ANGLE_MIN) || 
             (imuTheta2 < CALIB_IMU_ANGLE_MIN) || 
@@ -290,6 +292,9 @@ void writeSensorStream()
   outPayload.add(target);
   outPayload.add(desired.val(0));
   outPayload.add(control.val(0));
+  outPayload.add(RAD2DEG(phi1));
+  outPayload.add(RAD2DEG(phi2));
+  outPayload.add(RAD2DEG(phi3));
 
   // Add additional data if in DIAGNOSTICS mode
   if (streamType == DIAGNOSTICS) {

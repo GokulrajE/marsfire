@@ -16,6 +16,7 @@ byte setHumanLimbKinParams(byte* payload, int strtInx) {
   valRangeCheck = isWithinRange(temp.num, MIN_UA_LENGTH, MAX_UA_LENGTH);
   if (!valRangeCheck) return NOLIMBKINPARAM;
   uaLength = temp.num;
+  uaL2 = uaLength * uaLength;
   inx += 4;
   // Forearm length
   _assignFloatUnionBytes(inx, payload, &temp);
@@ -24,6 +25,8 @@ byte setHumanLimbKinParams(byte* payload, int strtInx) {
   valRangeCheck = isWithinRange(temp.num, MIN_FA_LENGTH, MAX_FA_LENGTH);
   if (!valRangeCheck) return NOLIMBKINPARAM;
   faLength = temp.num;
+  faL2 = faLength * faLength;
+  uafaL = uaLength * faLength;
   inx += 4;
   // Shoulder position
   _assignFloatUnionBytes(inx, payload, &temp);
@@ -83,14 +86,38 @@ byte setHumanLimbDynParams(byte* payload, int strtInx) {
 
 void updateEndpointPosition()
 {
-  // arm inverse kinematics
-  // float _t1 = DEG2RAD(theta1);
-  // float _t2 = DEG2RAD(theta2);
-  // float _t3 = DEG2RAD(theta3);
   float _temp = L1 * cos2 + L2 * cos(theta2r + theta3r);
   xEp = cos1 * _temp;
   yEp = sin1 * _temp;
   zEp = - L1 * sin2 - L2 * sin(theta2r + theta3r);
+}
+
+void updateHumanJointAngles()
+{
+  // Only if the kinematic parameters are set.
+  if (limbKinParam != YESLIMBKINPARAM) {
+    phi1 = 0;
+    phi2 = 0;
+    phi3 = 0;
+    return;
+  }
+  // We can do inverse kinematics.
+  float _zEp = zEp - shPosZ;
+  phi1 = atan2(yEp, xEp);
+
+  // Transform to the robot plane.
+  float _xEp = xEp * cos(-phi1) - yEp * sin(-phi1);
+  
+  // Compute phi3.
+  float _r2 = (_xEp * _xEp) + (_zEp * _zEp);
+  float _ratio1 = (uaL2 + faL2 - _r2) / (2 * uafaL);
+  _ratio1 = min(1.0, max(_ratio1, -1.0));
+  phi3 = acos(_ratio1) - PI;
+
+  // Compute phi2.
+  float _ratio2 = (_r2 + uaL2 - faL2) / (2 * uaLength * sqrt(_r2));
+  _ratio2 = min(1.0, max(_ratio2, -1.0));
+  phi2 = acos(_ratio2) - atan2(_zEp, _xEp);
 }
 
 float getMarsGravityCompensationTorque()

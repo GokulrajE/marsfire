@@ -94,12 +94,16 @@ void updateSensorData() {
   updateEndpointPosition();
 
   // 6. Compute the human limb joint angles. 
-
+  updateHumanJointAngles();
 
   // 7. Update the current torque and rate of change of torque.
-  torque = epForce * sqrt(xEp * xEp + yEp * yEp) / 1000;
-  dTorque = (torque - torquePrev) / delTime;
+  // Adjust enpoint force
+  // Adjust for the weight of the arm rest.
+  epForce += ARM_REST_WEIGHT * sin1;
   torquePrev = torque;
+  momentArm = sqrt(xEp * xEp + yEp * yEp);
+  torque = epForce * momentArm;
+  dTorque = (torque - torquePrev) / delTime;
 }
 
 

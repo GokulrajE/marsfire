@@ -46,21 +46,15 @@ byte setHumanLimbDynParams(byte* payload, int strtInx) {
   bool valRangeCheck;
   // Upper arm weight
   _assignFloatUnionBytes(inx, payload, &temp);
-  valRangeCheck = isWithinRange(temp.num, MIN_UA_LENGTH, MAX_UA_LENGTH);
+  valRangeCheck = isWithinRange(temp.num, MIN_UA_WEIGHT, MAX_UA_WEIGHT);
   if (!valRangeCheck) return NOLIMBDYNPARAM;
-  uaLength = temp.num;
+  uaWeight = temp.num;
   inx += 4;
   // Forearm weight
   _assignFloatUnionBytes(inx, payload, &temp);
-  valRangeCheck = isWithinRange(temp.num, MIN_FA_LENGTH, MAX_FA_LENGTH);
+  valRangeCheck = isWithinRange(temp.num, MIN_FA_WEIGHT, MAX_FA_WEIGHT);
   if (!valRangeCheck) return NOLIMBDYNPARAM;
-  faLength = temp.num;
-  inx += 4;
-  // Shoulder position
-  _assignFloatUnionBytes(inx, payload, &temp);
-  valRangeCheck = isWithinRange(temp.num, MIN_SHLDR_Z_POS, MAX_SHLDR_Z_POS);
-  if (!valRangeCheck) return NOLIMBDYNPARAM;
-  shPosZ = temp.num;
+  faWeight = temp.num;
   // Update the human limb parameter bytes.
   // updateHumanLimbDynParamBytes();
   return YESLIMBDYNPARAM;
@@ -130,4 +124,12 @@ float getMarsGravityCompensationTorque()
           + marsGCParam[5] * cos3 * sin1 * sin2
           + marsGCParam[6] * cos2 * sin1 * sin3
           + marsGCParam[7] * sin1 * sin2 * sin3);
+}
+
+float getHumanJointTorque()
+{
+  float _sp1 = sin(phi1);
+  float _cp2 = cos(phi2);
+  float _cp23 = cos(phi2 - phi3);
+  return uaWeight * _sp1 * _cp2 + faWeight * _sp1 * _cp23;
 }

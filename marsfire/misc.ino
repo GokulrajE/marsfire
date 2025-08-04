@@ -104,6 +104,9 @@ void updateSensorData() {
   momentArm = sqrt(xEp * xEp + yEp * yEp);
   torque = epForce * momentArm;
   dTorque = (torque - torquePrev) / delTime;
+
+  // Compute human limb torque.
+  hLimbTorque = ctrlType != AWS ? 0.0 : getHumanJointTorque();
 }
 
 

@@ -60,7 +60,7 @@
 #define NONE                  0x00
 #define POSITION              0x01
 #define TORQUE                0x02
-#define AWS                   0x03
+#define AWS                   0x03    // Arm Weight Support
 
 // Out data type
 #define SENSORSTREAM          0x00
@@ -110,7 +110,9 @@
 #define TORQTGT_SIG_MA_SPRD   0.1     // m
 #define TORQTGT_SIG_FLX_MID   -120    // Degrees       
 #define TORQTGT_SIG_FLX_SPRD  10      // Degrees
-
+#define AWS_TARGET_MIN        0.0     // Proportion of arm weight to support.
+#define AWS_TARGET_MAX        1.0     // Proportion of arm weight to support.
+#define AWS_TRANS_FACTOR      0.995
 
 // Error types 
 #define ANGSENSERR            0x0001
@@ -161,10 +163,10 @@
 #define MAX_UA_LENGTH         0.400   // meters
 #define MIN_FA_LENGTH         0.100   // meters
 #define MAX_FA_LENGTH         0.300   // meters
-#define MIN_UA_WEIGHT         1.000   // Kg
-#define MAX_UA_WEIGHT         5.000   // Kg
-#define MIN_FA_WEIGHT         1.000   // Kg
-#define MAX_FA_WEIGHT         5.000   // Kg
+#define MIN_UA_WEIGHT         -8.00   // Kg
+#define MAX_UA_WEIGHT         -1.00   // Kg
+#define MIN_FA_WEIGHT         -5.00   // Kg
+#define MAX_FA_WEIGHT         -0.100  // Kg
 #define MIN_SHLDR_X_POS       -0.15   // meters
 #define MAX_SHLDR_X_POS       +0.15   // meters
 #define MIN_SHLDR_Y_POS       -0.15   // meters
@@ -276,6 +278,13 @@ float momentArm;
 float epForce;
 float torque, torquePrev;
 float dTorque;
+// The following torque value is used when switching from an 
+// INVALID_TARGET to a valid target in the AWS control mode.
+float awsOldTorque;
+float beta = 0;
+
+// Human limb torque
+float hLimbTorque;
 
 // Human limb parameters and their codes.
 float uaLength, faLength;

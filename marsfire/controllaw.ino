@@ -61,8 +61,15 @@ void updateControlLaw() {
       _currPWM = convertCurrentToPWM(_currI);
       break;
     case TORQUE:
-      // Updat desired position
-      float _torqtgt = getDesiredTorqueValue();
+    case AWS:
+      // Updat desired position based on the control type.
+      float _torqtgt;
+      if (ctrlType == TORQUE) {
+        _torqtgt = getDesiredTorqueValue();
+      } else {
+         cxv x
+      }
+      float _torqtgt = ctrlType == TORQUE ? getDesiredTorqueValue() : getDesiredAWSTarget();
       // Scale target down based on moment arm and robot's flexion angle.
       float _scaleMA = SIGMOID((momentArm - TORQTGT_SIG_MA_MID) / TORQTGT_SIG_MA_SPRD);
       float _scaleShFlex = SIGMOID((theta1 - TORQTGT_SIG_FLX_MID) / TORQTGT_SIG_FLX_SPRD);
@@ -300,6 +307,12 @@ float getDesiredPositionValue() {
 // Compute the desired torque target value.
 float getDesiredTorqueValue() {
   if (target == INVALID_TARGET) return 0.0;
+  float _t = runTime.num / 1000.0f;
+  return (strtPos + (target - strtPos) * mjt((_t - initTime) / tgtDur));
+}
+
+// Compute the desired AWS target value.
+float getDesiredAWSTarget() {
   float _t = runTime.num / 1000.0f;
   return (strtPos + (target - strtPos) * mjt((_t - initTime) / tgtDur));
 }

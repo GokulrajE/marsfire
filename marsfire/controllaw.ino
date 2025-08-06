@@ -8,11 +8,23 @@
 
 // Changing control types must always be done by calling this function.
 // This will ensure all the control related variables are set correctly.
+// This function will allow us to set a new control type only from the NONE
+// control type. It does not allow transition between control modes.
 void setControlType(byte ctype) {
-  // Setting the control type is dependent on what other information has 
-  // been set in the firmware.
+  // We want to change the current control type to NONE. No problem. Just
+  // change it and leave.
+  if (ctype == NONE) {
+    ctrlType = NONE;
+    target = INVALID_TARGET;
+    desired.add(INVALID_TARGET);
+    return;
+  }
+  // We want to set some other control mode. This can be done only if the 
+  // current control mode is NONE.
+  // Leave if the current control type is not NONE.
+  if (ctrlType == NONE) return;
+  // Alright, the current control model is NONE.
   switch (ctype) {
-    case NONE:
     case POSITION:
     case TORQUE:
       // Nothing needs to be set.
@@ -20,16 +32,8 @@ void setControlType(byte ctype) {
       break;
     case AWS:
       // Upper-limb kinematic and dynamic parameters need to set.
-      SerialUSB.print("Setting AWS: ");
-      SerialUSB.print(limbKinParam);
-      SerialUSB.print(", ");
-      SerialUSB.print(limbDynParam);
-      SerialUSB.print("\n");
-      if ((limbKinParam == NOLIMBKINPARAM) || (limbDynParam == NOLIMBDYNPARAM)) {
-        ctrlType = NONE;
-      } else {
-        ctrlType = ctype;
-      }
+      if ((limbKinParam == NOLIMBKINPARAM) || (limbDynParam == NOLIMBDYNPARAM)) break;
+      ctrlType = ctype;
       break;
   }
   target = INVALID_TARGET;
@@ -38,17 +42,17 @@ void setControlType(byte ctype) {
 
 // Transition control between POSITION and AWS. This is necessary for helping the 
 // subject relax when in the rest state.
-// void transitionControl((byte* payload, int strtInx) {
-//   // First byte in the payload is the new control type.
-//   // If this matches the current control type, then do nothing.
-//   if (ctrlType == payload[0]) return;
+void transitionControl((byte* payload, int strtInx) {
+  // First byte in the payload is the new control type.
+  // If this matches the current control type, then do nothing.
+  if (ctrlType == payload[0]) return;
   
-//   // Its different.
-//   byte _ctrlType = payload[0];
+  // Its different.
+  byte _ctrlType = payload[0];
   
-//   target = INVALID_TARGET;
-//   desired.add(INVALID_TARGET);
-// }
+  target = INVALID_TARGET;
+  desired.add(INVALID_TARGET);
+}
 
 void updateControlLaw() {
   float _currI = 0.0;

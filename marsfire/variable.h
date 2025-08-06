@@ -280,9 +280,9 @@ float momentArm;
 float epForce;
 float torque, torquePrev;
 float dTorque;
-// The following torque value is used when switching from an 
-// INVALID_TARGET to a valid target in the AWS control mode.
-float awsOldTorque;
+
+// Variables to handle transition between POSITION and AWS control.
+float transitionTorque = 0;
 float beta = 0;
 
 // Human limb torque

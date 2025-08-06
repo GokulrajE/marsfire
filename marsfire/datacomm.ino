@@ -33,20 +33,18 @@ void readHandleIncomingMessage() {
         _cmdSet = 0x01;
         break;
       case SET_CONTROL_TYPE:
-        ctrlType = NONE;
-        SerialUSB.println("Setting Control Type");
         // This can be set only if there is not error.
         if (deviceError.num != 0) break;
         // Device must be calibration.
         if (calib == NOCALIB) break;
         // Limb has to be set.
         if (currLimb == NOLIMB) break;
+        // This command can be used only if the current control mode is NONE.
         // Set control.
         setControlType(_details);
         _cmdSet = 0x01;
         break;
       case SET_CONTROL_TARGET:
-        SerialUSB.println("Setting Control Target");
         // No control target setting for NONE.
         if (ctrlType == NONE) break;
         // Make sure that a minimum amount of time has passed since the previous target set.
@@ -57,81 +55,45 @@ void readHandleIncomingMessage() {
         // This can lead to oscillations.
         if ((abs(omega1) > POSITION_RATE_LIMIT) || (abs(dTorque) > TORQUE_RATE_LIMIT)) break;
         // All preliminary checks are done.
-        // Check if the current control type is POSITION or TORQUE.
-        if ((ctrlType == POSITION) || (ctrlType == TORQUE)) {
-          // Parse the target details.
-          parseTargetDetails(serReader.payload, 1, tempArray);
-          // Check that the target is within the appropriate limits.
-          // tempArray[2] has the target value.
-          if ((ctrlType == POSITION) && 
-              (isWithinRange(tempArray[2], POSITION_TARGET_MIN, POSITION_TARGET_MAX) == false)) break;
-          if ((ctrlType == TORQUE) &&
-              (isWithinRange(tempArray[2], TORQUE_TARGET_MIN, TORQUE_TARGET_MAX) == false)) break;
-          // Set target.
-          strtPos = tempArray[0];
-          strtTime = tempArray[1];
-          target = tempArray[2];
-          tgtDur = tempArray[3];
-          // Initial time.
-          initTime = runTime.num / 1000.0f + strtTime;
-          // Set the current target set time.
-          targetSetTime = runTime.num;
-          _cmdSet = 0x01;
-        } else if (ctrlType == AWS) {
-          // Parse the target details.
-          parseTargetDetails(serReader.payload, 1, tempArray);
-          if (isWithinRange(tempArray[2], AWS_TARGET_MIN, AWS_TARGET_MAX) == false) break;
-          // Check if the current target is an INVALID_TARGET.
-          if (target == INVALID_TARGET) {
-            awsOldTorque = torque;
-            beta = 1.0;
-            strtPos = 1.0;
-          } else {
-            strtPos = target;
-            beta = 0;
-          }
-          // Set target.
-          strtTime = tempArray[1];
-          target = tempArray[2];
-          tgtDur = tempArray[3];
-          SerialUSB.print("AWS Target: ");
-          SerialUSB.print(awsOldTorque);
-          SerialUSB.print(", ");
-          SerialUSB.print(beta);
-          SerialUSB.print(", ");
-          SerialUSB.print(strtPos);
-          SerialUSB.print(", ");
-          SerialUSB.print(strtTime);
-          SerialUSB.print(", ");
-          SerialUSB.print(target);
-          SerialUSB.print(", ");
-          SerialUSB.print(tgtDur);
-          SerialUSB.print("\n");
-          // Initial time.
-          initTime = runTime.num / 1000.0f + strtTime;
-          // Set the current target set time.
-          targetSetTime = runTime.num;
-          _cmdSet = 0x01;
-        }
+        // Parse the target details.
+        parseTargetDetails(serReader.payload, 1, tempArray);
+        // Check that the target is within the appropriate limits.
+        // tempArray[2] has the target value.
+        if ((ctrlType == POSITION) && 
+            (isWithinRange(tempArray[2], POSITION_TARGET_MIN, POSITION_TARGET_MAX) == false)) break;
+        if ((ctrlType == TORQUE) &&
+            (isWithinRange(tempArray[2], TORQUE_TARGET_MIN, TORQUE_TARGET_MAX) == false)) break;
+        if ((ctrlType == AWS) &&
+            (isWithinRange(tempArray[2], AWS_TARGET_MIN, AWS_TARGET_MAX) == false)) break;
+        // Set target.
+        strtPos = ctrlType == AWS ? target : tempArray[0];
+        strtTime = tempArray[1];
+        target = tempArray[2];
+        tgtDur = tempArray[3];
+        // Initial time.
+        initTime = runTime.num / 1000.0f + strtTime;
+        // Set the current target set time.
+        targetSetTime = runTime.num;
+        _cmdSet = 0x01;
         break;
-      // case TRANSITION_CONTROL:
-      //   // This is used to transition between POSITION and AWS controls with minimal 
-      //   // noticable change for the user.
-      //   // First set the control Type.
-      //   SerialUSB.println("Transitioning Control");
-      //   // This can be set only if there is not error.
-      //   if (deviceError.num != 0) break;
-      //   // Device must be calibration.
-      //   if (calib == NOCALIB) break;
-      //   // Limb has to be set.
-      //   if (currLimb == NOLIMB) break;
-      //   // Both the kinematic and dynamic parameters must be set.
-      //   if ((limbKinParam == NOLIMBKINPARAM) || (limbDynParam == NOLIMBDYNPARAM)) break;
-      //   // Transition control.
-      //   transitionControl(serReader.payload, 1);
-      //   setControlType(_details);
-      //   _cmdSet = 0x01;
-      //   break;
+      case TRANSITION_CONTROL:
+        // This is used to transition between POSITION and AWS controls with minimal 
+        // noticable change for the user.
+        // First set the control Type.
+        SerialUSB.println("Transitioning Control");
+        // This can be set only if there is not error.
+        if (deviceError.num != 0) break;
+        // Device must be calibration.
+        if (calib == NOCALIB) break;
+        // Limb has to be set.
+        if (currLimb == NOLIMB) break;
+        // Both the kinematic and dynamic parameters must be set.
+        if ((limbKinParam == NOLIMBKINPARAM) || (limbDynParam == NOLIMBDYNPARAM)) break;
+        // Transition control.
+        transitionControl(serReader.payload, 1);
+        setControlType(_details);
+        _cmdSet = 0x01;
+        break;
       // case SET_CONTROL_BOUND:
       //   // This can be set only if there is no error.
       //   if (deviceError.num != 0) break;

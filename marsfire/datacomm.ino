@@ -16,7 +16,7 @@ void readHandleIncomingMessage() {
     _details = serReader.payload[1];
     // Handle new message.
     // Check the command type.
-    if (serReader.payload[0] != 0x80) SerialUSB.println(serReader.payload[0]);
+    // if (serReader.payload[0] != 0x80) SerialUSB.println(serReader.payload[0]);
     switch (serReader.payload[0]) {
       case START_STREAM:
         stream = true;
@@ -34,6 +34,7 @@ void readHandleIncomingMessage() {
         break;
       case SET_CONTROL_TYPE:
         ctrlType = NONE;
+        SerialUSB.println("Setting Control Type");
         // This can be set only if there is not error.
         if (deviceError.num != 0) break;
         // Device must be calibration.
@@ -45,6 +46,7 @@ void readHandleIncomingMessage() {
         _cmdSet = 0x01;
         break;
       case SET_CONTROL_TARGET:
+        SerialUSB.println("Setting Control Target");
         // No control target setting for NONE.
         if (ctrlType == NONE) break;
         // Make sure that a minimum amount of time has passed since the previous target set.
@@ -86,11 +88,25 @@ void readHandleIncomingMessage() {
             strtPos = 1.0;
           } else {
             strtPos = target;
+            beta = 0;
           }
           // Set target.
           strtTime = tempArray[1];
           target = tempArray[2];
           tgtDur = tempArray[3];
+          SerialUSB.print("AWS Target: ");
+          SerialUSB.print(awsOldTorque);
+          SerialUSB.print(", ");
+          SerialUSB.print(beta);
+          SerialUSB.print(", ");
+          SerialUSB.print(strtPos);
+          SerialUSB.print(", ");
+          SerialUSB.print(strtTime);
+          SerialUSB.print(", ");
+          SerialUSB.print(target);
+          SerialUSB.print(", ");
+          SerialUSB.print(tgtDur);
+          SerialUSB.print("\n");
           // Initial time.
           initTime = runTime.num / 1000.0f + strtTime;
           // Set the current target set time.
@@ -98,6 +114,24 @@ void readHandleIncomingMessage() {
           _cmdSet = 0x01;
         }
         break;
+      // case TRANSITION_CONTROL:
+      //   // This is used to transition between POSITION and AWS controls with minimal 
+      //   // noticable change for the user.
+      //   // First set the control Type.
+      //   SerialUSB.println("Transitioning Control");
+      //   // This can be set only if there is not error.
+      //   if (deviceError.num != 0) break;
+      //   // Device must be calibration.
+      //   if (calib == NOCALIB) break;
+      //   // Limb has to be set.
+      //   if (currLimb == NOLIMB) break;
+      //   // Both the kinematic and dynamic parameters must be set.
+      //   if ((limbKinParam == NOLIMBKINPARAM) || (limbDynParam == NOLIMBDYNPARAM)) break;
+      //   // Transition control.
+      //   transitionControl(serReader.payload, 1);
+      //   setControlType(_details);
+      //   _cmdSet = 0x01;
+      //   break;
       // case SET_CONTROL_BOUND:
       //   // This can be set only if there is no error.
       //   if (deviceError.num != 0) break;

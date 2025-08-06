@@ -20,6 +20,11 @@ void setControlType(byte ctype) {
       break;
     case AWS:
       // Upper-limb kinematic and dynamic parameters need to set.
+      SerialUSB.print("Setting AWS: ");
+      SerialUSB.print(limbKinParam);
+      SerialUSB.print(", ");
+      SerialUSB.print(limbDynParam);
+      SerialUSB.print("\n");
       if ((limbKinParam == NOLIMBKINPARAM) || (limbDynParam == NOLIMBDYNPARAM)) {
         ctrlType = NONE;
       } else {
@@ -30,6 +35,20 @@ void setControlType(byte ctype) {
   target = INVALID_TARGET;
   desired.add(INVALID_TARGET);
 }
+
+// Transition control between POSITION and AWS. This is necessary for helping the 
+// subject relax when in the rest state.
+// void transitionControl((byte* payload, int strtInx) {
+//   // First byte in the payload is the new control type.
+//   // If this matches the current control type, then do nothing.
+//   if (ctrlType == payload[0]) return;
+  
+//   // Its different.
+//   byte _ctrlType = payload[0];
+  
+//   target = INVALID_TARGET;
+//   desired.add(INVALID_TARGET);
+// }
 
 void updateControlLaw() {
   float _currI = 0.0;
@@ -62,14 +81,29 @@ void updateControlLaw() {
       break;
     case TORQUE:
     case AWS:
-      // Updat desired position based on the control type.
+      // Update desired position based on the control type.
       float _torqtgt;
       if (ctrlType == TORQUE) {
         _torqtgt = getDesiredTorqueValue();
       } else {
-         cxv x
+        // Get the weight support target.
+        float _awstgt = getDesiredAWSTarget();
+        // Compute the torque target.
+        beta = beta < 0.001 ? 0.0 : beta * AWS_TRANS_FACTOR;
+        _torqtgt = beta * awsOldTorque + (1 - beta) * AWS_SCALE_FACTOR * _awstgt * hLimbTorque;
+        SerialUSB.print("ASW: ");
+        SerialUSB.print(beta);
+        SerialUSB.print(", ");
+        SerialUSB.print(awsOldTorque);
+        SerialUSB.print(", ");
+        SerialUSB.print(_awstgt);
+        SerialUSB.print(", ");
+        SerialUSB.print(hLimbTorque);
+        SerialUSB.print(", ");
+        SerialUSB.print(_torqtgt);
+        SerialUSB.print("\n");
       }
-      float _torqtgt = ctrlType == TORQUE ? getDesiredTorqueValue() : getDesiredAWSTarget();
+      // float _torqtgt = ctrlType == TORQUE ? getDesiredTorqueValue() : getDesiredAWSTarget();
       // Scale target down based on moment arm and robot's flexion angle.
       float _scaleMA = SIGMOID((momentArm - TORQTGT_SIG_MA_MID) / TORQTGT_SIG_MA_SPRD);
       float _scaleShFlex = SIGMOID((theta1 - TORQTGT_SIG_FLX_MID) / TORQTGT_SIG_FLX_SPRD);
@@ -301,20 +335,23 @@ float mjt(float t) {
 float getDesiredPositionValue() {
   if (target == INVALID_TARGET) return actual.val(0);
   float _t = runTime.num / 1000.0f;
-  return strtPos + (target - strtPos) * mjt((_t - initTime) / tgtDur);
+  float _tgt = strtPos + (target - strtPos) * mjt((_t - initTime) / tgtDur);
+  return min(POSITION_TARGET_MAX, max(POSITION_TARGET_MIN, _tgt));
 }
 
 // Compute the desired torque target value.
 float getDesiredTorqueValue() {
   if (target == INVALID_TARGET) return 0.0;
   float _t = runTime.num / 1000.0f;
-  return (strtPos + (target - strtPos) * mjt((_t - initTime) / tgtDur));
+  float _tgt = strtPos + (target - strtPos) * mjt((_t - initTime) / tgtDur);
+  return min(TORQUE_TARGET_MAX, max(TORQUE_TARGET_MIN, _tgt));
 }
 
 // Compute the desired AWS target value.
 float getDesiredAWSTarget() {
   float _t = runTime.num / 1000.0f;
-  return (strtPos + (target - strtPos) * mjt((_t - initTime) / tgtDur));
+  float _tgt = strtPos + (target - strtPos) * mjt((_t - initTime) / tgtDur);
+  return min(AWS_TARGET_MAX, max(AWS_TARGET_MIN, _tgt));
 }
 
 // Desired torque scaler.

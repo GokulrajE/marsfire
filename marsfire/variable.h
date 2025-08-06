@@ -86,6 +86,7 @@
 #define GET_LIMB_DYN_PARAM    0x0C
 #define RESET_LIMB_KIN_PARAM  0x0D
 #define RESET_LIMB_DYN_PARAM  0x0E
+#define TRANSITION_CONTROL    0x0F
 #define HEARTBEAT             0x80
 
 // Control Law Related Definitions
@@ -100,7 +101,7 @@
 #define MAX_CURRENT           10
 #define POS_CTRL_DBAND        0
 #define POSITION_TARGET_MIN   -120    // Degrees
-#define POSITION_TARGET_MAX   0       // Degrees
+#define POSITION_TARGET_MAX   20      // Degrees
 #define TORQUE_CTRL_DBAND     0
 #define TORQUE_TARGET_MIN     -20     // Nm
 #define TORQUE_TARGET_MAX     20      // Nm
@@ -113,6 +114,7 @@
 #define AWS_TARGET_MIN        0.0     // Proportion of arm weight to support.
 #define AWS_TARGET_MAX        1.0     // Proportion of arm weight to support.
 #define AWS_TRANS_FACTOR      0.995
+#define AWS_SCALE_FACTOR      0.9     // A fixed scale factor for arm weight support.
 
 // Error types 
 #define ANGSENSERR            0x0001

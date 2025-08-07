@@ -16,7 +16,7 @@ void readHandleIncomingMessage() {
     _details = serReader.payload[1];
     // Handle new message.
     // Check the command type.
-    // if (serReader.payload[0] != 0x80) SerialUSB.println(serReader.payload[0]);
+    if (serReader.payload[0] != 0x80) SerialUSB.println(serReader.payload[0]);
     switch (serReader.payload[0]) {
       case START_STREAM:
         stream = true;
@@ -41,8 +41,7 @@ void readHandleIncomingMessage() {
         if (currLimb == NOLIMB) break;
         // This command can be used only if the current control mode is NONE.
         // Set control.
-        setControlType(_details);
-        _cmdSet = 0x01;
+        _cmdSet = setControlType(_details) ? 0x01 : 0x00;
         break;
       case SET_CONTROL_TARGET:
         // No control target setting for NONE.
@@ -66,10 +65,17 @@ void readHandleIncomingMessage() {
         if ((ctrlType == AWS) &&
             (isWithinRange(tempArray[2], AWS_TARGET_MIN, AWS_TARGET_MAX) == false)) break;
         // Set target.
-        strtPos = ctrlType == AWS ? target : tempArray[0];
+        // Choose the initial value appropriately.
+        if (ctrlType == AWS) {
+          strtPos = target == INVALID_TARGET ? 0.0 : target;
+        }
+        else {
+          strtPos = tempArray[0];
+        }
+        // Set the rest of the target related variables.
         strtTime = tempArray[1];
         target = tempArray[2];
-        tgtDur = tempArray[3];
+        tgtDur = tempArray[3];        
         // Initial time.
         initTime = runTime.num / 1000.0f + strtTime;
         // Set the current target set time.
@@ -90,104 +96,8 @@ void readHandleIncomingMessage() {
         // Both the kinematic and dynamic parameters must be set.
         if ((limbKinParam == NOLIMBKINPARAM) || (limbDynParam == NOLIMBDYNPARAM)) break;
         // Transition control.
-        transitionControl(serReader.payload, 1);
-        setControlType(_details);
-        _cmdSet = 0x01;
+        _cmdSet = transitionControl(serReader.payload, 1) ? 0x01 : 0x00;
         break;
-      // case SET_CONTROL_BOUND:
-      //   // This can be set only if there is no error.
-      //   if (deviceError.num != 0) break;
-      //   // No Error
-      //   // Check if the current control type is POSITION.
-      //   ctrlBound = 0.0;
-      //   if ((ctrlType == POSITION)
-      //       || (ctrlType == POSITIONLINEAR)
-      //       || (ctrlType == POSITIONAAN)) {
-      //     ctrlBound = _details / 255.0;
-      //   }
-      //   break;
-      // case SET_CONTROL_DIR:
-      //   // This can be set only if there is not error.
-      //   if (deviceError.num != 0) break;
-      //   // No Error
-      //   // Check if the current control type is POSITIONAAN.
-      //   ctrlDir = 0;
-      //   if (ctrlType == POSITIONAAN) {
-      //     ctrlDir = _details;
-      //   }
-      //   break;
-      // case SET_CONTROL_GAIN:
-      //   // Reset controller gain.
-      //   ctrlGain = 0;
-      //   // Set the gain of the controller.
-      //   // This can be set only if there is not error.
-      //   if (deviceError.num != 0) break;
-      //   // No Error
-      //   ctrlGain = (uint8_t) _details;
-      //   break;
-      // case SET_AAN_TARGET:
-      //   // This can be set only if there is no error.
-      //   if (deviceError.num != 0) break;
-      //   // No Error.
-      //   if (ctrlType != POSITIONAAN) break;
-      //   // Set AAN Target.
-      //   setAANTarget(serReader.payload, 1);
-      //   // Set Control Direction.
-      //   ctrlDir = target >= strtPos ? +1 : -1;
-      //   // Initial time.
-      //   initTime = runTime.num / 1000.0f + strtTime;
-      //   #if SERIALUSB_DEBUG
-      //     SerialUSB.print(strtPos);
-      //     SerialUSB.print(",");
-      //     SerialUSB.print(strtTime);
-      //     SerialUSB.print(",");
-      //     SerialUSB.print(target);
-      //     SerialUSB.print(",");
-      //     SerialUSB.print(reachDur);
-      //     SerialUSB.print(",");
-      //     SerialUSB.print(initTime);
-      //     SerialUSB.print("\n");
-      //   #endif
-      //   break;
-      // case HOLD_CONTROL:
-      //   // This can be set only if there is no error.
-      //   if (deviceError.num != 0) break;
-      //   // No Error
-      //   // Check if the current control type is POSITION.
-      //   setControlHold(CONTROL_FREE);
-      //   if ((ctrlType == POSITION)
-      //       || (ctrlType == POSITIONLINEAR)
-      //       || (ctrlType == POSITIONAAN)) {
-      //     setControlHold(CONTROL_HOLD);
-      //   }
-      //   break;
-      // case DECAY_CONTROL:
-      //   // This can be set only if there is no error.
-      //   if (deviceError.num != 0) break;
-      //   // No Error
-      //   // Check if the current control type is POSITION.
-      //   setControlHold(CONTROL_FREE);
-      //   if ((ctrlType == POSITION)
-      //       || (ctrlType == POSITIONLINEAR)
-      //       || (ctrlType == POSITIONAAN)
-      //       || (ctrlType == OBJECTSIM)) {
-      //     setControlHold(CONTROL_DECAY);
-      //   }
-      //   break;
-      // case SET_OBJECT_PARAM:
-      //   if (deviceError.num != 0) break;
-      //   if (ctrlType != OBJECTSIM) break;
-      //   setObjectParams(serReader.payload, 1);
-      //   setControlHold(CONTROL_FREE);
-      //   break;
-      // case GET_OBJECT_PARAM:
-      //   // Send the current firmware version.
-      //   sendObjectParams();
-      //   break;
-      // case RESET_AAN_TARGET:
-      //   target = INVALID_TARGET;
-      //   ctrlDir = 0;
-      //   break;
       case SET_LIMB:
         // This can only be set if there is no error.
         if (deviceError.num != 0) break;
@@ -230,8 +140,8 @@ void readHandleIncomingMessage() {
       case SET_LIMB_DYN_PARAM:
         // This can be set only if there is no error.
         if (deviceError.num != 0) break;
-        // This can only be set if the control is POSITION.
-        if (ctrlType != POSITION) break;
+        // This can only be set if the control is NONE or POSITION.
+        if ((ctrlType != NONE) && (ctrlType != POSITION)) break;
         // Check if the limb has been set.
         if (currLimb == NOLIMB) break;
         // This can only be set if the robot has been calibrated.

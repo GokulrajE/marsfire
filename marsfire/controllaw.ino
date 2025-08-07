@@ -10,19 +10,22 @@
 // This will ensure all the control related variables are set correctly.
 // This function will allow us to set a new control type only from the NONE
 // control type. It does not allow transition between control modes.
-void setControlType(byte ctype) {
+bool setControlType(byte ctype) {
+  // Reset beta and transition torque.
+  beta = 0;
+  transitionTorque = 0;
   // We want to change the current control type to NONE. No problem. Just
   // change it and leave.
   if (ctype == NONE) {
     ctrlType = NONE;
     target = INVALID_TARGET;
     desired.add(INVALID_TARGET);
-    return;
+    return true;
   }
   // We want to set some other control mode. This can be done only if the 
   // current control mode is NONE.
   // Leave if the current control type is not NONE.
-  if (ctrlType == NONE) return;
+  if (ctrlType != NONE) return false;
   // Alright, the current control model is NONE.
   switch (ctype) {
     case POSITION:
@@ -32,26 +35,72 @@ void setControlType(byte ctype) {
       break;
     case AWS:
       // Upper-limb kinematic and dynamic parameters need to set.
-      if ((limbKinParam == NOLIMBKINPARAM) || (limbDynParam == NOLIMBDYNPARAM)) break;
+      if ((limbKinParam == NOLIMBKINPARAM) || (limbDynParam == NOLIMBDYNPARAM)) return false;
       ctrlType = ctype;
       break;
   }
   target = INVALID_TARGET;
   desired.add(INVALID_TARGET);
+  return true;
 }
 
 // Transition control between POSITION and AWS. This is necessary for helping the 
 // subject relax when in the rest state.
-void transitionControl((byte* payload, int strtInx) {
+bool transitionControl(byte* payload, int strtInx) {
   // First byte in the payload is the new control type.
   // If this matches the current control type, then do nothing.
-  if (ctrlType == payload[0]) return;
+  if (ctrlType == payload[strtInx]) {
+    return false;
+  }
   
   // Its different.
-  byte _ctrlType = payload[0];
+  byte _ctrlType = payload[strtInx];
+
+  // Read the target information.
+  parseTargetDetails(serReader.payload, strtInx + 1, tempArray);
+  // Check that the target is within the appropriate limits.
+  // tempArray[2] has the target value.
+  if ((_ctrlType == POSITION) && 
+      (isWithinRange(tempArray[2], POSITION_TARGET_MIN, POSITION_TARGET_MAX) == false)) return false;
+  if ((_ctrlType == AWS) &&
+      (isWithinRange(tempArray[2], AWS_TARGET_MIN, AWS_TARGET_MAX) == false)) return false;
   
-  target = INVALID_TARGET;
-  desired.add(INVALID_TARGET);
+  // Set control type
+  ctrlType = _ctrlType;
+  
+  // Set target.
+  strtPos = ctrlType == AWS ? 1.0 : actual.val(0);
+  strtTime = tempArray[1];
+  target = tempArray[2];
+  tgtDur = tempArray[3];
+
+  // Initial time.
+  initTime = runTime.num / 1000.0f + strtTime;
+  
+  // Set the current target set time.
+  targetSetTime = runTime.num;
+
+  // Record the transition torque.
+  beta = 1.0;
+  transitionTorque = torque;
+
+  SerialUSB.print("Transition Ctrl: ");
+  SerialUSB.print(ctrlType);
+  SerialUSB.print(", ");
+  SerialUSB.print(strtPos);
+  SerialUSB.print(", ");
+  SerialUSB.print(strtTime);
+  SerialUSB.print(", ");
+  SerialUSB.print(target);
+  SerialUSB.print(", ");
+  SerialUSB.print(tgtDur);
+  SerialUSB.print(", ");
+  SerialUSB.print(beta);
+  SerialUSB.print(", ");
+  SerialUSB.print(transitionTorque);
+  SerialUSB.print("\n");
+
+  return true;
 }
 
 void updateControlLaw() {
@@ -76,11 +125,13 @@ void updateControlLaw() {
     case POSITION:
       // Update desired position
       desired.add(getDesiredPositionValue());
-      // Position control.
-      _currI = limbControlScale * controlPosition();
-      // Add the MARS gravity compensation torque
+      // MARS gravity compensation torque
       marsGCTorque = MARS_GRAV_COMP_ADJUST * limbControlScale * getMarsGravityCompensationTorque() / MOTOR_T2I;
-      _currI += marsGCTorque;
+      _currI = marsGCTorque;
+      // Transition torque weightage.
+      beta = beta < 0.001 ? 0.0 : beta * AWS_TRANS_FACTOR;
+      // Position control.
+      _currI += beta * ( - MARS_GRAV_COMP_ADJUST * transitionTorque / MOTOR_T2I) + (1 - beta) * limbControlScale * controlPosition();
       _currPWM = convertCurrentToPWM(_currI);
       break;
     case TORQUE:
@@ -94,52 +145,22 @@ void updateControlLaw() {
         float _awstgt = getDesiredAWSTarget();
         // Compute the torque target.
         beta = beta < 0.001 ? 0.0 : beta * AWS_TRANS_FACTOR;
-        _torqtgt = beta * awsOldTorque + (1 - beta) * AWS_SCALE_FACTOR * _awstgt * hLimbTorque;
-        SerialUSB.print("ASW: ");
-        SerialUSB.print(beta);
-        SerialUSB.print(", ");
-        SerialUSB.print(awsOldTorque);
-        SerialUSB.print(", ");
-        SerialUSB.print(_awstgt);
-        SerialUSB.print(", ");
-        SerialUSB.print(hLimbTorque);
-        SerialUSB.print(", ");
-        SerialUSB.print(_torqtgt);
-        SerialUSB.print("\n");
+        _torqtgt = beta * transitionTorque + (1 - beta) * AWS_SCALE_FACTOR * _awstgt * hLimbTorque;
       }
       // float _torqtgt = ctrlType == TORQUE ? getDesiredTorqueValue() : getDesiredAWSTarget();
       // Scale target down based on moment arm and robot's flexion angle.
       float _scaleMA = SIGMOID((momentArm - TORQTGT_SIG_MA_MID) / TORQTGT_SIG_MA_SPRD);
       float _scaleShFlex = SIGMOID((theta1 - TORQTGT_SIG_FLX_MID) / TORQTGT_SIG_FLX_SPRD);
       desired.add(_scaleShFlex * _scaleMA * _torqtgt);
-      // Feedforward torque.
-      _currI = - 0.5 * limbControlScale * desired.val(0);
-      // Torque PD control.
-      _currI += - limbControlScale * controlTorque();
       // Add the MARS gravity compensation torque
       marsGCTorque = MARS_GRAV_COMP_ADJUST * limbControlScale * getMarsGravityCompensationTorque() / MOTOR_T2I;
-      _currI += marsGCTorque;
+      _currI = marsGCTorque;
+      // Feedforward torque.
+      _currI += - 0.5 * limbControlScale * desired.val(0);
+      // Torque PD control.
+      _currI += - limbControlScale * controlTorque();
       _currPWM = convertCurrentToPWM(_currI);
       break;
-    // case POSITIONAAN:
-    //   // Check if its an invalid target
-    //   desired.add(getAANDesiredTrajectory());
-    //   // Position control.
-    //   _currI = controlPositionAAN();
-    //   _currPWM = boundPositionControl(convertCurrentToPWM(_currI));
-    //   break;
-    // case TORQUE:
-    //   // Feedfoward torque control.
-    //   _currI = target / MECHANICAL_CONST;
-    //   _currPWM = convertCurrentToPWM(_currI);
-    //   break;
-    // case RESIST:
-      // PD resistance control
-      // desTorq = -(kp * (_ang - neutral_ang) + kd * 0.02 * _ang - kd * 0.02 * prev_ang);
-      // cur = desTorq / mechnicalConstant;
-      // __currpwm = constrain(map(abs(cur), 0, maxCurrent, 0.1 * 255, 0.9 * 255), -229, 229);
-      // prev_ang = _ang;
-      // break;
   }
   // Dampen control.
   _currPWM = dampenControlForSafety(_currPWM, ctrlType);

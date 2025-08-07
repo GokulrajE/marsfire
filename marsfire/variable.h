@@ -114,7 +114,7 @@
 #define AWS_TARGET_MIN        0.0     // Proportion of arm weight to support.
 #define AWS_TARGET_MAX        1.0     // Proportion of arm weight to support.
 #define AWS_TRANS_FACTOR      0.995
-#define AWS_SCALE_FACTOR      0.9     // A fixed scale factor for arm weight support.
+#define AWS_SCALE_FACTOR      1.0     // A fixed scale factor for arm weight support.
 
 // Error types 
 #define ANGSENSERR            0x0001

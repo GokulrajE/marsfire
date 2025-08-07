@@ -168,7 +168,7 @@
 #define MIN_UA_WEIGHT         -8.00   // Kg
 #define MAX_UA_WEIGHT         -1.00   // Kg
 #define MIN_FA_WEIGHT         -5.00   // Kg
-#define MAX_FA_WEIGHT         -0.100  // Kg
+#define MAX_FA_WEIGHT         +1.00   // Kg
 #define MIN_SHLDR_X_POS       -0.15   // meters
 #define MAX_SHLDR_X_POS       +0.15   // meters
 #define MIN_SHLDR_Y_POS       -0.15   // meters

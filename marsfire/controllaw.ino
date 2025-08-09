@@ -296,23 +296,25 @@ float rateLimitValue(float curr, float prev, float rlim) {
 
 // Dampen the control output if the speed is too fast.
 float dampenControlForSafety(float currPWM, byte cType) {
-  switch(cType) {
+  float _bDamp = 0.0;
+  float _sign = omega1 > 0 ? +1 : -1;
+  float _vel;
+  switch(ctrlType) {
     case NONE:
-      if  (omega1 > 10) {
-        float _vel = (omega1 - 10) / 5.0;
-        currPWM += - limbControlScale * 10 *_vel * _vel;
-      }
+      _bDamp = omega1 > SAFETY_DAMP_VEL_TH ? SAFETY_DAMP_VALUE : 0.0;
+      _vel = abs(omega1 - SAFETY_DAMP_VEL_TH) / 5.0;
       break;
     case POSITION:
     case TORQUE:
-      if  (abs(omega1) > 10) {
-        float _sign = omega1 > 0 ? +1 : -1;
-        float _vel = abs(omega1 - 10) / 5.0;
-        currPWM += - limbControlScale * 10 * _sign * _vel * _vel;
-      }
+      _bDamp = abs(omega1) > SAFETY_DAMP_VEL_TH ? SAFETY_DAMP_VALUE : 0.0;
+      _vel = abs(omega1 - SAFETY_DAMP_VEL_TH) / 5.0;
       break;
+    case AWS:
+      _bDamp = 2.0 * SAFETY_DAMP_VALUE;
+      _vel = abs(omega1) / 5.0;
       break;
   }
+  currPWM += - limbControlScale * _bDamp * _sign * _vel * _vel;
   return currPWM;
 }
 

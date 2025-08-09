@@ -115,6 +115,8 @@
 #define AWS_TARGET_MAX        1.0     // Proportion of arm weight to support.
 #define AWS_TRANS_FACTOR      0.995
 #define AWS_SCALE_FACTOR      1.0     // A fixed scale factor for arm weight support.
+#define SAFETY_DAMP_VEL_TH    10.0    // deg / sec
+#define SAFETY_DAMP_VALUE     10.0    // PWM / (deg / sec)
 
 // Error types 
 #define ANGSENSERR            0x0001

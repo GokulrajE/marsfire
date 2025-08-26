@@ -290,7 +290,11 @@ void updateImu() {
   // Theta 1.
   imuTheta1 = (norm1 * RAD2DEG(atan2(ax1, ay1))
                + norm2 * RAD2DEG(atan2(ax2, ay2))) / norm_sum;
+  SerialUSB.print(imuTheta1);
+  SerialUSB.print(",");
   imuTheta1 -= IMU1OFFSET; 
+  SerialUSB.print(imuTheta1);
+  SerialUSB.print("\n");
   imuTheta2 = RAD2DEG(atan2(-az1, norm1));
   imuTheta2 -= IMU2OFFSET; 
   imuTheta3 = RAD2DEG(atan2(-az2, norm2)) - imuTheta2;

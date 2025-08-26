@@ -107,10 +107,10 @@
 #define TORQUE_TARGET_MAX     20      // Nm
 #define POSITION_RATE_LIMIT   5       // Degrees / sec
 #define TORQUE_RATE_LIMIT     0.25    // Nm / sec
-#define TORQTGT_SIG_MA_MID    0.3     // m       
-#define TORQTGT_SIG_MA_SPRD   0.1     // m
-#define TORQTGT_SIG_FLX_MID   -120    // Degrees       
-#define TORQTGT_SIG_FLX_SPRD  10      // Degrees
+#define TORQTGT_SIG_MA_MID    0.15    // m       
+#define TORQTGT_SIG_MA_SPRD   0.10    // m
+#define TORQTGT_SIG_FLX_MID   -100    // Degrees       
+#define TORQTGT_SIG_FLX_SPRD  5       // Degrees
 #define AWS_TARGET_MIN        0.0     // Proportion of arm weight to support.
 #define AWS_TARGET_MAX        1.0     // Proportion of arm weight to support.
 #define AWS_TRANS_FACTOR      0.995
@@ -146,9 +146,9 @@
 
 // IMU offsets
 #define IMU1OFFSET            0.00
-#define IMU2OFFSET            0.00
-#define IMU3OFFSET            0.00
-#define IMU4OFFSET            0.00
+#define IMU2OFFSET            -9.3
+#define IMU3OFFSET            -3.0
+#define IMU4OFFSET            -4.75
 
 // Calibration angle limits
 #define CALIB_IMU_ANGLE_MIN   -20.0
@@ -189,7 +189,7 @@
 #define SIGMOID(x)            1 / (1 + exp(-5 * x))
 
 // Version and device ID.
-const char* fwVersion = "25.07";
+const char* fwVersion = "25.08";
 const char* deviceId  = "MARS-HOMER";
 const char* compileDate = __DATE__ " " __TIME__;
 

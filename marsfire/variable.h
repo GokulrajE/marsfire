@@ -59,16 +59,12 @@
 // Control type
 #define NONE                  0x00
 #define POSITION              0x01
-#define TORQUE                0x02
-#define AWS                   0x03    // Arm Weight Support
 
 // Out data type
-#define SENSORSTREAM          0x00
-#define CONTROLPARAM          0x01
-#define DIAGNOSTICS           0x02
-#define HLIMKINPARAM          0x03
-#define HLIMDYNPARAM          0x04
-#define VERSION               0x05
+#define VERSION               0x00
+#define SENSORSTREAM          0x01
+#define CONTROLPARAM          0x02
+#define DIAGNOSTICS           0x03
 
 // In data type
 #define GET_VERSION           0x00
@@ -80,13 +76,6 @@
 #define SET_CONTROL_TYPE      0x06
 #define SET_CONTROL_TARGET    0x07
 #define SET_DIAGNOSTICS       0x08
-#define SET_LIMB_KIN_PARAM    0x09
-#define SET_LIMB_DYN_PARAM    0x0A
-#define GET_LIMB_KIN_PARAM    0x0B
-#define GET_LIMB_DYN_PARAM    0x0C
-#define RESET_LIMB_KIN_PARAM  0x0D
-#define RESET_LIMB_DYN_PARAM  0x0E
-#define TRANSITION_CONTROL    0x0F
 #define HEARTBEAT             0x80
 
 // Control Law Related Definitions
@@ -94,7 +83,7 @@
 #define INTEGRATOR_LIMIT      4.0
 #define POS_ERROR_CAP         10.0    // Degrees
 #define POS_ERROR_DIFF_CAP    2.0     // Degrees
-#define POS_ERROR_DIFF_LIMIT  20      // Degrees
+#define POS_ERROR_DIFF_LIMIT  30      // Degrees
 #define PWMRESOLN             12      // This has been changed from 8. Suggestions from Aravind.
 #define MINPWM                410     // 10% of 4095
 #define MAXPWM                3686    // 90% of 4095
@@ -103,19 +92,7 @@
 #define POS_CTRL_DBAND        0
 #define POSITION_TARGET_MIN   -120    // Degrees
 #define POSITION_TARGET_MAX   20      // Degrees
-#define TORQUE_CTRL_DBAND     0
-#define TORQUE_TARGET_MIN     -20     // Nm
-#define TORQUE_TARGET_MAX     20      // Nm
 #define POSITION_RATE_LIMIT   5       // Degrees / sec
-#define TORQUE_RATE_LIMIT     0.25    // Nm / sec
-#define TORQTGT_SIG_MA_MID    0.15    // m       
-#define TORQTGT_SIG_MA_SPRD   0.10    // m
-#define TORQTGT_SIG_FLX_MID   -100    // Degrees       
-#define TORQTGT_SIG_FLX_SPRD  5       // Degrees
-#define AWS_TARGET_MIN        0.0     // Proportion of arm weight to support.
-#define AWS_TARGET_MAX        1.0     // Proportion of arm weight to support.
-#define AWS_TRANS_FACTOR      0.995
-#define AWS_SCALE_FACTOR      1.0     // A fixed scale factor for arm weight support.
 #define SAFETY_DAMP_VEL_TH    10.0    // deg / sec
 #define SAFETY_DAMP_VALUE     20.0    // PWM / (deg / sec)
 
@@ -139,12 +116,6 @@
 // Button bounce threshold
 #define BOUNCE_THRESHOLD      5
 
-// Limb parameter status
-#define NOLIMBKINPARAM        0x00
-#define YESLIMBKINPARAM       0x01
-#define NOLIMBDYNPARAM        0x00
-#define YESLIMBDYNPARAM       0x01
-
 // IMU offsets
 #define IMU1OFFSET            0.00
 #define IMU2OFFSET            -9.3
@@ -162,22 +133,6 @@
 // MARS robot parameters.
 #define L1                    0.475   // meters
 #define L2                    0.291   // meters
-
-// Human limb parameter ranges
-#define MIN_UA_LENGTH         0.150   // meters
-#define MAX_UA_LENGTH         0.400   // meters
-#define MIN_FA_LENGTH         0.100   // meters
-#define MAX_FA_LENGTH         0.300   // meters
-#define MIN_UA_WEIGHT         -8.00   // Kg
-#define MAX_UA_WEIGHT         -1.00   // Kg
-#define MIN_FA_WEIGHT         -5.00   // Kg
-#define MAX_FA_WEIGHT         +1.00   // Kg
-#define MIN_SHLDR_X_POS       -0.15   // meters
-#define MAX_SHLDR_X_POS       +0.15   // meters
-#define MIN_SHLDR_Y_POS       -0.15   // meters
-#define MAX_SHLDR_Y_POS       +0.15   // meters
-#define MIN_SHLDR_Z_POS       0.100   // meters
-#define MAX_SHLDR_Z_POS       0.500   // meters
 
 // Heart beat related variable
 #define MAX_HBEAT_INTERVAL    2.0 // Seconds
@@ -215,8 +170,6 @@ byte cmdStatus = COMMAND_NONE;
 bool stream = true;
 byte ctrlType = NONE;
 byte calib = NOCALIB;
-byte limbKinParam = NOLIMBKINPARAM;
-byte limbDynParam = NOLIMBDYNPARAM;
 uint16union_t deviceError;
 
 // Packet Counter.
@@ -277,38 +230,16 @@ int8_t imu1Byte, imu2Byte, imu3Byte, imu4Byte;
 
 // Endpoint kinematics of the robot.
 float xEp, yEp, zEp;
-float momentArm;
 
 // Endpoint force.
 float epForce;
 float torque, torquePrev;
 float dTorque;
 
-// Variables to handle transition between POSITION and AWS control.
-float transitionTorque = 0;
-float beta = 0;
-
-// Human limb torque
-float hLimbTorque;
-
-// Human limb parameters and their codes.
-float uaLength, faLength;
-// Square of the limb lengths which will be used for inverse kinematics.
-float uaL2, faL2, uafaL;
-// uint8_t uaLByte, faLByte;
-float shPosZ;
-// uint8_t shZByte;
-float uaWeight, faWeight;
-// Human joint angles.
-float phi1, phi2, phi3;
-
 // Controller gains
 float pcKp = 1.5;
 float pcKd = 7.8;
 float pcKi = 0;
-float tcKp = 0.5;
-float tcKd = 0.7;
-float tcKi = 0.1;
 // Control related buffers
 float err;
 float errdiff;
@@ -327,7 +258,7 @@ float tempArray[8];
 // Safety Time Flags.
 unsigned long targetSetTime;
 
-
+// --------------
 // Old variables.
 float th1, th2, th3, th4;
 float upperArm, foreArm;

@@ -33,8 +33,6 @@ void setup() {
   stream = true;
   ctrlType = NONE;
   calib = NOCALIB;
-  limbKinParam = NOLIMBKINPARAM;
-  limbDynParam = NOLIMBDYNPARAM;
   deviceError.num = 0x0000;
 
   // Reset packet number and run time.

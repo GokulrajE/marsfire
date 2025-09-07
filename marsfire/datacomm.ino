@@ -50,9 +50,9 @@ void readHandleIncomingMessage() {
         if ((runTime.num - targetSetTime) < TARGET_SET_BACKOUT) break;
         // This can be set only if there is not error.
         if (deviceError.num != 0) break;
-        // Ensure that the position or torque is not changing too rapidly.
+        // Ensure that the position is not changing too rapidly.
         // This can lead to oscillations.
-        if ((abs(omega1) > POSITION_RATE_LIMIT) || (abs(dTorque) > TORQUE_RATE_LIMIT)) break;
+        if (abs(omega1) > POSITION_RATE_LIMIT) break;
         // All preliminary checks are done.
         // Parse the target details.
         parseTargetDetails(serReader.payload, 1, tempArray);
@@ -60,18 +60,9 @@ void readHandleIncomingMessage() {
         // tempArray[2] has the target value.
         if ((ctrlType == POSITION) && 
             (isWithinRange(tempArray[2], POSITION_TARGET_MIN, POSITION_TARGET_MAX) == false)) break;
-        if ((ctrlType == TORQUE) &&
-            (isWithinRange(tempArray[2], TORQUE_TARGET_MIN, TORQUE_TARGET_MAX) == false)) break;
-        if ((ctrlType == AWS) &&
-            (isWithinRange(tempArray[2], AWS_TARGET_MIN, AWS_TARGET_MAX) == false)) break;
         // Set target.
-        // Choose the initial value appropriately.
-        if (ctrlType == AWS) {
-          strtPos = target == INVALID_TARGET ? 0.0 : target;
-        }
-        else {
-          strtPos = tempArray[0];
-        }
+        // Choose the initial value.
+        strtPos = tempArray[0];
         // Set the rest of the target related variables.
         strtTime = tempArray[1];
         target = tempArray[2];
@@ -82,22 +73,6 @@ void readHandleIncomingMessage() {
         targetSetTime = runTime.num;
         _cmdSet = 0x01;
         break;
-      case TRANSITION_CONTROL:
-        // This is used to transition between POSITION and AWS controls with minimal 
-        // noticable change for the user.
-        // First set the control Type.
-        // SerialUSB.println("Transitioning Control");
-        // This can be set only if there is not error.
-        if (deviceError.num != 0) break;
-        // Device must be calibration.
-        if (calib == NOCALIB) break;
-        // Limb has to be set.
-        if (currLimb == NOLIMB) break;
-        // Both the kinematic and dynamic parameters must be set.
-        if ((limbKinParam == NOLIMBKINPARAM) || (limbDynParam == NOLIMBDYNPARAM)) break;
-        // Transition control.
-        _cmdSet = transitionControl(serReader.payload, 1) ? 0x01 : 0x00;
-        break;
       case SET_LIMB:
         // This can only be set if there is no error.
         if (deviceError.num != 0) break;
@@ -105,64 +80,8 @@ void readHandleIncomingMessage() {
         if (ctrlType != NONE) break;
         // Reset calibration
         calib = NOCALIB;
-        // Reset human limb parameter set.
-        limbKinParam = NOLIMBKINPARAM;
-        limbDynParam = NOLIMBDYNPARAM;
         // Make sure the input limb is one of the valid options.
         setLimb(isValidLimb(_details) ? _details : NOLIMB);
-        _cmdSet = 0x01;
-        break;
-      case SET_LIMB_KIN_PARAM:
-        // This can be set only if there is no error.
-        if (deviceError.num != 0) break;
-        // This can only be set if the control is NONE.
-        if ((ctrlType != NONE) && (ctrlType != POSITION)) break;
-        // Check if the limb has been set.
-        if (currLimb == NOLIMB) break;
-        // This can only be set if the robot has been calibrated.
-        if (calib == NOCALIB) break;
-        // Reset human limb dynamic parameter.
-        limbDynParam = NOLIMBDYNPARAM;
-        // Unpack the data and set the limb parameters.
-        limbKinParam = setHumanLimbKinParams(serReader.payload, 1);
-        if (limbKinParam == YESLIMBKINPARAM) _cmdSet = 0x01;
-        break;
-      case GET_LIMB_KIN_PARAM:
-        sendHumanLimbKinParam();
-        _cmdSet = 0x01;
-        break;
-      case RESET_LIMB_KIN_PARAM:
-        // Reset human limb parameter set.
-        limbKinParam = NOLIMBKINPARAM;
-        limbDynParam = NOLIMBDYNPARAM;
-        _cmdSet = 0x01;
-        break;
-      case SET_LIMB_DYN_PARAM:
-        // This can be set only if there is no error.
-        if (deviceError.num != 0) break;
-        // This can only be set if the control is NONE or POSITION.
-        if ((ctrlType != NONE) && (ctrlType != POSITION)) break;
-        // Check if the limb has been set.
-        if (currLimb == NOLIMB) break;
-        // This can only be set if the robot has been calibrated.
-        if (calib == NOCALIB) break;
-        // This can only set if the kinematic parameters are set.
-        if (limbKinParam == NOLIMBKINPARAM) break;
-        // Unpack the data and set the limb parameters.
-        // SerialUSB.print("Dynamic Parameter ");
-        limbDynParam = setHumanLimbDynParams(serReader.payload, 1);
-        // SerialUSB.print(uaWeight);
-        // SerialUSB.print(" ");
-        // SerialUSB.print(faWeight);
-        if (limbDynParam == YESLIMBDYNPARAM) _cmdSet = 0x01;
-        break;
-      case GET_LIMB_DYN_PARAM:
-        sendHumanLimbDynParam();
-        _cmdSet = 0x01;
-        break;
-      case RESET_LIMB_DYN_PARAM:
-        // Reset human limb parameter set.
-        limbDynParam = NOLIMBDYNPARAM;
         _cmdSet = 0x01;
         break;
       case CALIBRATE:
@@ -175,9 +94,6 @@ void readHandleIncomingMessage() {
         // Reset calibration
         // Check the calibration value
         calib = NOCALIB;
-        // Reset human limb parameter set.
-        limbKinParam = NOLIMBKINPARAM;
-        limbDynParam = NOLIMBDYNPARAM;
         // Ensure that the IMU angles are not too off.
         if ((imuTheta1 < CALIB_IMU_ANGLE_MIN) || 
             (imuTheta2 < CALIB_IMU_ANGLE_MIN) || 
@@ -226,7 +142,6 @@ void readHandleIncomingMessage() {
   }
 }
 
-
 void writeSensorStream()
 {
   // Format:
@@ -249,9 +164,6 @@ void writeSensorStream()
   outPayload.add(target);
   outPayload.add(desired.val(0));
   outPayload.add(control.val(0));
-  outPayload.add(RAD2DEG(phi1));
-  outPayload.add(RAD2DEG(phi2));
-  outPayload.add(RAD2DEG(phi3));
 
   // Add additional data if in DIAGNOSTICS mode
   if (streamType == DIAGNOSTICS) {
@@ -260,7 +172,6 @@ void writeSensorStream()
     outPayload.add(errsum);
     outPayload.add(marsGCTorque);
     outPayload.add(omega1);
-    outPayload.add(dTorque);
   }
 
   // Send packet.
@@ -375,52 +286,6 @@ void sendVersionDetails() {
   bt.flush();
 }
 
-
-void sendHumanLimbKinParam() {
-  // Format:
-  // 255 | 255 | No. of bytes | Status | Error Val 1 | Error Val 2 | ...
-  // Payload | Chksum
-  byte header[] = {0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00 };
-  byte chksum = 0xFE;
-  byte _temp;
-
-  //Out data buffer
-  outPayload.newPacket();
-  outPayload.add(uaLength);
-  outPayload.add(faLength);
-  outPayload.add(shPosZ);
-
-  // Send packet.
-  header[2] = (4                      // Four headers
-               + outPayload.sz() * 4  // Limb Kin param
-               + 1                    // Checksum
-               );
-  header[3] = getProgramStatus(HLIMKINPARAM);
-  header[4] = deviceError.bytes[0];
-  header[5] = deviceError.bytes[1];
-  header[6] = getAdditionalInfo();
-  chksum += header[2] + header[3] + header[4] + header[5] + header[6];
-
-  //Send header
-  bt.write(header[0]);
-  bt.write(header[1]);
-  bt.write(header[2]);
-  bt.write(header[3]);
-  bt.write(header[4]);
-  bt.write(header[5]);
-  bt.write(header[6]);
-  
-  // Send the floats
-  for (int i = 0; i < outPayload.sz() * 4; i++) {
-    _temp = outPayload.getByte(i);
-    bt.write(_temp);
-    chksum += _temp;
-  }
-
-  bt.write(chksum);
-  bt.flush();
-}
-
 /*
  * Check if the given limb is valid.
  */
@@ -431,52 +296,6 @@ bool isValidLimb(byte limbval) {
     (limbval == LEFT)
   );
 }
-
-
-void sendHumanLimbDynParam() {
-  // Format:
-  // 255 | 255 | No. of bytes | Status | Error Val 1 | Error Val 2 | ...
-  // Payload | Chksum
-  byte header[] = {0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00 };
-  byte chksum = 0xFE;
-  byte _temp;
-
-  //Out data buffer
-  outPayload.newPacket();
-  outPayload.add(uaWeight);
-  outPayload.add(faWeight);
-
-  // Send packet.
-  header[2] = (4                      // Four headers
-               + outPayload.sz() * 4  // Limb Kin param
-               + 1                    // Checksum
-               );
-  header[3] = getProgramStatus(HLIMDYNPARAM);
-  header[4] = deviceError.bytes[0];
-  header[5] = deviceError.bytes[1];
-  header[6] = getAdditionalInfo();
-  chksum += header[2] + header[3] + header[4] + header[5] + header[6];
-
-  //Send header
-  bt.write(header[0]);
-  bt.write(header[1]);
-  bt.write(header[2]);
-  bt.write(header[3]);
-  bt.write(header[4]);
-  bt.write(header[5]);
-  bt.write(header[6]);
-  
-  // Send the floats
-  for (int i = 0; i < outPayload.sz() * 4; i++) {
-    _temp = outPayload.getByte(i);
-    bt.write(_temp);
-    chksum += _temp;
-  }
-
-  bt.write(chksum);
-  bt.flush();
-}
-
 
 // Parse the toque/position target details.
 void parseTargetDetails(byte* payload, int strtInx, float *out) {
@@ -499,21 +318,3 @@ void parseTargetDetails(byte* payload, int strtInx, float *out) {
   _assignFloatUnionBytes(inx, payload, &temp);
   out[3] = max(MIN_TARGET_DUR, temp.num);
 }
-
-
-// void readHandleIncomingMessage() {
-//     int plSz = serReader.readUpdate();
-//     payLoadSize = plSz*1.0;
-//     int stInx = 0;
-
-//     // Read handle incoming data
-//     if (plSz > 0 && plSz == 16) {
-//         // Handle new message.
-//         // Check the command type.
-
-//         setSupport(plSz, stInx, serReader.payload);
-
-//        serReader.payloadHandled();
-//        Serial.clear();
-//     }
-// }

@@ -92,23 +92,7 @@ void updateSensorData() {
 
   // 5. Compute robot endpoint position.
   updateEndpointPosition();
-
-  // 6. Compute the human limb joint angles. 
-  updateHumanJointAngles();
-
-  // 7. Update the current torque and rate of change of torque.
-  // Adjust enpoint force
-  // Adjust for the weight of the arm rest.
-  epForce += ARM_REST_WEIGHT * sin1;
-  torquePrev = torque;
-  momentArm = sqrt(xEp * xEp + yEp * yEp);
-  torque = epForce * momentArm;
-  dTorque = (torque - torquePrev) / delTime;
-
-  // Compute human limb torque.
-  hLimbTorque = ctrlType != AWS ? 0.0 : getHumanJointTorque();
 }
-
 
 void setSupport(int sz, int strtInx, byte* payload) {
   int inx = strtInx;
@@ -135,8 +119,8 @@ byte getProgramStatus(byte dtype) {
 
 
 byte getAdditionalInfo(void) {
-  // CMD_STATUS | CMD_STATUS | CALIB | MARS | LIMBDYNPARAM | LIMBKINPARAM | CURR LIMB | CURR LIMB
-  return (cmdStatus << 6) | (devButtons << 4) | (limbDynParam << 3) | (limbKinParam << 2) | currLimb;
+  // CMD_STATUS | CMD_STATUS | CALIB | MARS | x | x | CURR LIMB | CURR LIMB
+  return (cmdStatus << 6) | (devButtons << 4) | currLimb;
 }
 
 void setLimb(byte limb) {

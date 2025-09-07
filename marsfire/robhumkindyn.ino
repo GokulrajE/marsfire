@@ -11,8 +11,8 @@ byte setHumanLimbKinParams(byte* payload, int strtInx) {
   bool valRangeCheck;
   // Upper arm length
   _assignFloatUnionBytes(inx, payload, &temp);
-  SerialUSB.print(" UA: ");
-  SerialUSB.print(temp.num);
+  // SerialUSB.print(" UA: ");
+  // SerialUSB.print(temp.num);
   valRangeCheck = isWithinRange(temp.num, MIN_UA_LENGTH, MAX_UA_LENGTH);
   if (!valRangeCheck) return NOLIMBKINPARAM;
   uaLength = temp.num;
@@ -20,8 +20,8 @@ byte setHumanLimbKinParams(byte* payload, int strtInx) {
   inx += 4;
   // Forearm length
   _assignFloatUnionBytes(inx, payload, &temp);
-  SerialUSB.print(" FA: ");
-  SerialUSB.print(temp.num);
+  // SerialUSB.print(" FA: ");
+  // SerialUSB.print(temp.num);
   valRangeCheck = isWithinRange(temp.num, MIN_FA_LENGTH, MAX_FA_LENGTH);
   if (!valRangeCheck) return NOLIMBKINPARAM;
   faLength = temp.num;
@@ -30,8 +30,8 @@ byte setHumanLimbKinParams(byte* payload, int strtInx) {
   inx += 4;
   // Shoulder position
   _assignFloatUnionBytes(inx, payload, &temp);
-  SerialUSB.print("  Z: ");
-  SerialUSB.print(temp.num);
+  // SerialUSB.print("  Z: ");
+  // SerialUSB.print(temp.num);
   valRangeCheck = isWithinRange(temp.num, MIN_SHLDR_Z_POS, MAX_SHLDR_Z_POS);
   if (!valRangeCheck) return NOLIMBKINPARAM;
   shPosZ = temp.num;

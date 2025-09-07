@@ -86,7 +86,7 @@ void readHandleIncomingMessage() {
         // This is used to transition between POSITION and AWS controls with minimal 
         // noticable change for the user.
         // First set the control Type.
-        SerialUSB.println("Transitioning Control");
+        // SerialUSB.println("Transitioning Control");
         // This can be set only if there is not error.
         if (deviceError.num != 0) break;
         // Device must be calibration.
@@ -116,7 +116,7 @@ void readHandleIncomingMessage() {
         // This can be set only if there is no error.
         if (deviceError.num != 0) break;
         // This can only be set if the control is NONE.
-        if (ctrlType != NONE) break;
+        if ((ctrlType != NONE) && (ctrlType != POSITION)) break;
         // Check if the limb has been set.
         if (currLimb == NOLIMB) break;
         // This can only be set if the robot has been calibrated.
@@ -149,11 +149,11 @@ void readHandleIncomingMessage() {
         // This can only set if the kinematic parameters are set.
         if (limbKinParam == NOLIMBKINPARAM) break;
         // Unpack the data and set the limb parameters.
-        SerialUSB.print("Dynamic Parameter ");
+        // SerialUSB.print("Dynamic Parameter ");
         limbDynParam = setHumanLimbDynParams(serReader.payload, 1);
-        SerialUSB.print(uaWeight);
-        SerialUSB.print(" ");
-        SerialUSB.print(faWeight);
+        // SerialUSB.print(uaWeight);
+        // SerialUSB.print(" ");
+        // SerialUSB.print(faWeight);
         if (limbDynParam == YESLIMBDYNPARAM) _cmdSet = 0x01;
         break;
       case GET_LIMB_DYN_PARAM:

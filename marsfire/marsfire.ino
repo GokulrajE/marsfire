@@ -15,7 +15,7 @@ void setup() {
   
   // Set up stuff.
   deviceSetUp();
-  SerialUSB.println("Started.");
+  // SerialUSB.println("Started.");
 
   // Initialize variables.
   // Always use the setLimb function to change the limb.

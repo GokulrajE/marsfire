@@ -84,21 +84,21 @@ bool transitionControl(byte* payload, int strtInx) {
   beta = 1.0;
   transitionTorque = torque;
 
-  SerialUSB.print("Transition Ctrl: ");
-  SerialUSB.print(ctrlType);
-  SerialUSB.print(", ");
-  SerialUSB.print(strtPos);
-  SerialUSB.print(", ");
-  SerialUSB.print(strtTime);
-  SerialUSB.print(", ");
-  SerialUSB.print(target);
-  SerialUSB.print(", ");
-  SerialUSB.print(tgtDur);
-  SerialUSB.print(", ");
-  SerialUSB.print(beta);
-  SerialUSB.print(", ");
-  SerialUSB.print(transitionTorque);
-  SerialUSB.print("\n");
+  // SerialUSB.print("Transition Ctrl: ");
+  // SerialUSB.print(ctrlType);
+  // SerialUSB.print(", ");
+  // SerialUSB.print(strtPos);
+  // SerialUSB.print(", ");
+  // SerialUSB.print(strtTime);
+  // SerialUSB.print(", ");
+  // SerialUSB.print(target);
+  // SerialUSB.print(", ");
+  // SerialUSB.print(tgtDur);
+  // SerialUSB.print(", ");
+  // SerialUSB.print(beta);
+  // SerialUSB.print(", ");
+  // SerialUSB.print(transitionTorque);
+  // SerialUSB.print("\n");
 
   return true;
 }
@@ -132,6 +132,8 @@ void updateControlLaw() {
       beta = beta < 0.001 ? 0.0 : beta * AWS_TRANS_FACTOR;
       // Position control.
       _currI += beta * ( - MARS_GRAV_COMP_ADJUST * transitionTorque / MOTOR_T2I) + (1 - beta) * limbControlScale * controlPosition();
+      SerialUSB.print("Position Control: ");
+      SerialUSB.println(_currI);
       _currPWM = convertCurrentToPWM(_currI);
       break;
     case TORQUE:
@@ -154,16 +156,16 @@ void updateControlLaw() {
       desired.add(_scaleShFlex * _scaleMA * _torqtgt);
       // Add the MARS gravity compensation torque
       marsGCTorque = MARS_GRAV_COMP_ADJUST * limbControlScale * getMarsGravityCompensationTorque() / MOTOR_T2I;
-      _currI = marsGCTorque;
+      _currI = - marsGCTorque;
       // Feedforward torque.
-      _currI += - 0.5 * limbControlScale * desired.val(0);
+      _currI += 0.5 * limbControlScale * desired.val(0);
       // Torque PD control.
-      _currI += - limbControlScale * controlTorque();
+      _currI += limbControlScale * controlTorque();
       _currPWM = convertCurrentToPWM(_currI);
       break;
   }
   // Dampen control.
-  _currPWM = dampenControlForSafety(_currPWM, ctrlType);
+  _currPWM = dampenControlForSafety(_currPWM, ctrlType, currLimb);
   // Clip PWM value
   _currPWM = min(MAXPWM, max(-MAXPWM, _currPWM));
   // Send PWM value to motor controller & update control.
@@ -193,14 +195,15 @@ float controlPosition() {
   }
 
   // Update error related information.
-  // Current error
-  _currerr = _currtgt - _currang;
+  // Current error: Limit the error to be between +/- POS_ERROR_DIFF_LIMIT
+  // _currerr = min(POS_ERROR_DIFF_LIMIT, max(-POS_ERROR_DIFF_LIMIT, _currtgt - _currang));
+  _currerr = _currtgt - _currang; // softLimit(_currtgt - _currang, POS_ERROR_DIFF_LIMIT);
   // Ignore small errors.
   _currerr = (abs((_currerr)) <= POS_CTRL_DBAND) ? 0.0 : _currerr;
   // Proportional control term.
   _currp = pcKp * (_currerr);
 
-  // Previous error
+  // Previous error: Limit the error to be between +/- POS_ERROR_DIFF_LIMIT
   _preverr = (_prevtgt != INVALID_TARGET) ? _prevtgt - _prevang : _currerr;
   // Derivate control term.
   _currderr = _currerr - _preverr;
@@ -219,9 +222,15 @@ float controlPosition() {
   // Log error information
   err = _currp;
   errdiff = _currd;
-  errsum = _currp + _currd; //_curri;
+  errsum = _currp + _currd;
 
-  return _currp + _currd + _curri;
+  // Error based scaling of control output.
+  ctrlScale = 0.99 * ctrlScale + 0.01 * getControlScaleForScaledError(_currerr / POS_ERROR_DIFF_LIMIT);
+  ctrlScale = max(0, min(1, ctrlScale));
+  SerialUSB.print("Control Scale: ");
+  SerialUSB.println(ctrlScale);
+
+  return ctrlScale * (_currp + _currd + _curri);
 }
 
 float controlTorque() {
@@ -295,24 +304,32 @@ float rateLimitValue(float curr, float prev, float rlim) {
 }
 
 // Dampen the control output if the speed is too fast.
-float dampenControlForSafety(float currPWM, byte cType) {
+float dampenControlForSafety(float currPWM, byte cType, byte currLimb) {
   float _bDamp = 0.0;
   float _sign = omega1 > 0 ? +1 : -1;
   float _vel;
-  switch(ctrlType) {
-    case NONE:
-      _bDamp = omega1 > SAFETY_DAMP_VEL_TH ? SAFETY_DAMP_VALUE : 0.0;
-      _vel = abs(omega1 - SAFETY_DAMP_VEL_TH) / 5.0;
-      break;
-    case POSITION:
-    case TORQUE:
-      _bDamp = abs(omega1) > SAFETY_DAMP_VEL_TH ? SAFETY_DAMP_VALUE : 0.0;
-      _vel = abs(omega1 - SAFETY_DAMP_VEL_TH) / 5.0;
-      break;
-    case AWS:
-      _bDamp = 2.0 * SAFETY_DAMP_VALUE;
-      _vel = abs(omega1) / 5.0;
-      break;
+  // Check of no limb is set. If so, then damn both ways.
+  if (currLimb == NOLIMB) {
+    _bDamp = SAFETY_DAMP_VALUE;
+    _vel = omega1 / 5.0;
+  } else {
+    switch(ctrlType) {
+      case NONE:
+        _bDamp = omega1 > 0 ? SAFETY_DAMP_VALUE : 0.0;
+        _vel = omega1 / 5.0;
+        break;
+      case POSITION:
+        _bDamp = 5 * SAFETY_DAMP_VALUE;
+        _vel = omega1 / 5.0;
+      case TORQUE:
+        _bDamp = omega1 > SAFETY_DAMP_VEL_TH ? SAFETY_DAMP_VALUE : 0.0;
+        _vel = (omega1 - SAFETY_DAMP_VEL_TH) / 5.0;
+        break;
+      case AWS:
+        _bDamp = 2.0 * SAFETY_DAMP_VALUE;
+        _vel = omega1 / 5.0;
+        break;
+    }
   }
   currPWM += - limbControlScale * _bDamp * _sign * _vel * _vel;
   return currPWM;
@@ -379,6 +396,20 @@ float getDesiredAWSTarget() {
   float _t = runTime.num / 1000.0f;
   float _tgt = strtPos + (target - strtPos) * mjt((_t - initTime) / tgtDur);
   return min(AWS_TARGET_MAX, max(AWS_TARGET_MIN, _tgt));
+}
+
+// Soft limit.
+float softLimit(float x, float xScale) {
+  return xScale * (2 * SIGMOID(x / xScale) - 1);
+}
+
+// Error-based control scaling for safety.
+float getControlScaleForScaledError(float errScaled) {
+  // Left sigmoid
+  float _left = SIGMOID(2 * (errScaled + 1.25));
+  // Right sigmoid
+  float _right = SIGMOID(2 * (errScaled - 1.25));
+  return (0.98 * (_left - _right) + 0.02);
 }
 
 // Desired torque scaler.

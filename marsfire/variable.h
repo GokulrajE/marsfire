@@ -94,6 +94,7 @@
 #define INTEGRATOR_LIMIT      4.0
 #define POS_ERROR_CAP         10.0    // Degrees
 #define POS_ERROR_DIFF_CAP    2.0     // Degrees
+#define POS_ERROR_DIFF_LIMIT  20      // Degrees
 #define PWMRESOLN             12      // This has been changed from 8. Suggestions from Aravind.
 #define MINPWM                410     // 10% of 4095
 #define MAXPWM                3686    // 90% of 4095
@@ -116,7 +117,7 @@
 #define AWS_TRANS_FACTOR      0.995
 #define AWS_SCALE_FACTOR      1.0     // A fixed scale factor for arm weight support.
 #define SAFETY_DAMP_VEL_TH    10.0    // deg / sec
-#define SAFETY_DAMP_VALUE     10.0    // PWM / (deg / sec)
+#define SAFETY_DAMP_VALUE     20.0    // PWM / (deg / sec)
 
 // Error types 
 #define ANGSENSERR            0x0001
@@ -314,7 +315,11 @@ float errdiff;
 float errsum;
 float marsGCTorque;
 // Desired target related variables.
-float strtPos, strtTime, initTime, tgtDur; 
+float strtPos, strtTime, initTime, tgtDur;
+// Control Scale
+float ctrlScale = 1.0;
+// Control Bound
+float ctrlBound = 1.0;
 
 // Temporary variable for parsing incoming data.
 float tempArray[8];
@@ -372,8 +377,6 @@ int handUse;
 float controlSense;
 float force1, force2, fAct, fDes, fActiminus1;
 float errorLoadCell;
-
-
 
 float sigmoid, meanx = 0.1, spreadx = 0.03, theta1x;
 float sigmoidFlex, meanFlex = 140, spreadFlex = 7;

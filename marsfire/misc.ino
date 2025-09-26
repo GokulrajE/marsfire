@@ -45,9 +45,7 @@ void deviceSetUp() {
 void updateSensorData() {
   // 1. Read the force sensors.
   scale1.update();
-  epForce = -scale1.getData();
-  // scale2.update();
-  // force2 = scale2.getData();
+  epForce = scale1.getData();
 
   // 2. Read the encoder data.
   // Update previous values.
@@ -60,38 +58,22 @@ void updateSensorData() {
   theta2 = limbAngleScale * (read_angle2() + theta2Offset);
   theta3 = limbAngleScale * (read_angle3() + theta3Offset);
   theta4 = limbAngleScale * (read_angle4() - theta4Offset);
-  // Angle in radians.
-  theta1r = DEG2RAD(theta1);
-  theta2r = DEG2RAD(theta2);
-  theta3r = DEG2RAD(theta3);
-  theta4r = DEG2RAD(theta4);
-  // Cosine and Sine terms.
-  cos1 = cos(theta1r);
-  cos2 = cos(theta2r);
-  cos3 = cos(theta3r);
-  cos4 = cos(theta4r);
-  sin1 = sin(theta1r);
-  sin2 = sin(theta2r);
-  sin3 = sin(theta3r);
-  sin4 = sin(theta4r);
+  
   // 2a. Update actual angle buffer
   actual.add(theta1);
   // 2b. Compute the angular velocities
   omega1 = (theta1 - theta1Prev) / delTime;
-  omega2 = (theta2 - theta2Prev) / delTime;
-  omega3 = (theta3 - theta3Prev) / delTime;
-  omega4 = (theta4 - theta4Prev) / delTime;
 
   // 3. Read buttons.
   marsButton = updatButtonPressValue(MARS_BUTTON, &marsBounceCount, marsButton);
-  calibButton = updatButtonPressValue(CALIB_BUTTON, &calibBounceCount, calibButton);
-  devButtons = (calibButton << 1) | marsButton;
+  devButtons = marsButton;
 
   // 4. Read IMU data.
   updateImu();
 
-  // 5. Compute robot endpoint position.
-  updateEndpointPosition();
+  // Check for angle errors only after calibration has been done.
+  checkEncoderIMUMismatch();
+  checkEncoderJump();
 }
 
 void setSupport(int sz, int strtInx, byte* payload) {
@@ -157,36 +139,6 @@ byte updatButtonPressValue(byte pinNo, int8_t* bounceCount, byte buttonValue) {
   else if (*bounceCount >= BOUNCE_THRESHOLD) return 1;
   else return buttonValue;
 }
-
-
-// void readMarsButtonState(void) {
-//    button.update();                  // Update the Bounce instance
-//    marsButton = button.read();
-// }
-
-// void updateEncoders()
-// {
-//   theta1Enc = read_angle1();
-//   theta2Enc = read_angle2();
-//   theta3Enc = read_angle3();
-//   theta4Enc = read_angle4();
-
-//   theta1 = theta1Enc + offset1;
-//   theta2 = theta2Enc + offset2;
-//   theta3 = theta3Enc + offset3;
-//   theta4 = theta4Enc + offset4;
-
-// }
-
-// void updateLoadCells()
-// {
-//   scale1.update();
-//   force1 = -scale1.getData();
-
-//   scale2.update();
-//   force2 = scale2.getData();
-
-// }
 
 float read_angle1() {
   _enccount1 = angle1.read();
@@ -254,51 +206,41 @@ void updateImu() {
   mpu2.update();
   mpu3.update();
 
+  // Read IMUs
   ax1 = mpu.getAccX();
   ay1 = mpu.getAccY();
   az1 = mpu.getAccZ();
-
   ax2 = mpu2.getAccX();
   ay2 = mpu2.getAccY();
   az2 = mpu2.getAccZ();
-
   ax3 = mpu3.getAccX();
   ay3 = mpu3.getAccY();
   az3 = mpu3.getAccZ();
 
-  norm1 = pow(ax1 * ax1 + ay1 * ay1, 0.5);
-  norm2 = pow(ax2 * ax2 + ay2 * ay2, 0.5);
-  norm3 = pow(ay3 * ay3 + az3 * az3, 0.5);
-  norm_sum = norm1 + norm2;
-
-  // Theta 1.
-  imuTheta1 = (norm1 * RAD2DEG(atan2(ax1, ay1))
-               + norm2 * RAD2DEG(atan2(ax2, ay2))) / norm_sum;
-  // SerialUSB.print(imuTheta1);
-  // SerialUSB.print(",");
-  imuTheta1 -= IMU1OFFSET; 
-  // SerialUSB.print(imuTheta1);
-  // SerialUSB.print("\n");
-  imuTheta2 = RAD2DEG(atan2(-az1, norm1));
-  imuTheta2 -= IMU2OFFSET; 
-  imuTheta3 = RAD2DEG(atan2(-az2, norm2)) - imuTheta2;
-  imuTheta3 -= IMU3OFFSET; 
-  imuTheta4 = RAD2DEG(atan2(-ax3, norm3)) - imuTheta2 - imuTheta3;
-  imuTheta4 -= IMU4OFFSET; 
-
-  // Update the IMU angle bytes
-  imu1Byte = (int8_t) imuTheta1;
-  imu2Byte = (int8_t) imuTheta2;
-  imu3Byte = (int8_t) imuTheta3;
-  imu4Byte = (int8_t) imuTheta4;
+  // Theta 1 (Pitch of IMU1).
+  float _cosp;
+  norm1 = pow(ay1 * ay1 + az1 * az1, 0.5);
+  imuTheta1 = (abs(ax1) < 0.8) ? asin(ax1) : atan2(ax1, ay1 >= 0 ? norm1 : -norm1);
+  imuTheta1 -= IMU1PITCHOFFSET;
+  // Theta 2 (Roll of IMU1).
+  _cosp = cos(imuTheta1);
+  imuTheta2 = atan2(az1 / _cosp, ay1 / _cosp);
+  imuTheta2 -= IMU1ROLLOFFSET;
+  // Theta 2 (Roll of IMU2)
+  _cosp = cos(imuTheta1 - IMU2PITCHOFFSET);
+  imuTheta3 = atan2(az2 / _cosp, ay2 / _cosp) - imuTheta2;
+  imuTheta3 -= IMU2ROLLOFFSET;
+  // Theta 4 (Roll of IMU3)
+  _cosp = cos(imuTheta1 - IMU3PITCHOFFSET);
+  imuTheta4 = atan2(-ax3 / _cosp, ay2 / _cosp) - imuTheta2 - imuTheta2;
+  imuTheta4 -= IMU3ROLLOFFSET;
+  // Change IMU angles to degree.
+  imuTheta1 = RAD2DEG(imuTheta1);
+  imuTheta2 = RAD2DEG(imuTheta2);
+  imuTheta3 = RAD2DEG(imuTheta3);
+  imuTheta4 = RAD2DEG(imuTheta4);
 }
-
-// void calibButtonSetup()
-// {
-//   pinMode(CALIB_BUTTON, INPUT_PULLUP);
-// }
 
 void updateCalibButton() {
   calibButtonState = 1.0 * digitalRead(CALIB_BUTTON);
-  // Serial.println(digitalRead(calib_button_pin));
 }

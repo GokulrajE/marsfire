@@ -97,9 +97,11 @@
 #define SAFETY_DAMP_VALUE     20.0    // PWM / (deg / sec)
 
 // Error types 
-#define ANGSENSERR            0x0001
-#define MCURRSENSERR          0x0002
-#define NOHEARTBEAT           0x0004
+#define NOHEARTBEAT           0x0001
+#define ANG1MISMATCHERR       0x0002
+#define ANG234MISMATCHERR     0x0004
+#define ANG1JUMPERR           0x0008
+#define ANG234JUMPERR         0x0010
 
 // Safety timer thresholds
 #define TARGET_SET_BACKOUT    2000     // millisec
@@ -117,14 +119,20 @@
 #define BOUNCE_THRESHOLD      5
 
 // IMU offsets
-#define IMU1OFFSET            0.00
-#define IMU2OFFSET            -9.3
-#define IMU3OFFSET            -3.0
-#define IMU4OFFSET            -4.75
+#define IMU1PITCHOFFSET       0.00    // Radians
+#define IMU1ROLLOFFSET        0.00    // Radians
+#define IMU2PITCHOFFSET       0.00    // Radians
+#define IMU2ROLLOFFSET        0.00    // Radians
+#define IMU3PITCHOFFSET       0.00    // Radians
+#define IMU3ROLLOFFSET        0.00    // Radians
 
 // Calibration angle limits
-#define CALIB_IMU_ANGLE_MIN   -20.0
-#define CALIB_IMU_ANGLE_MAX   +20.0
+#define CALIB_IMU_ANGLE_MIN   -50.0
+#define CALIB_IMU_ANGLE_MAX   +50.0
+
+// Angle sensor error thresholds
+#define IMU_MISMATCH_ERROR    10.0    // Degrees
+#define ANG_JUMP_ERROR        5.0     // Degrees
 
 // Control related constant
 #define MARS_GRAV_COMP_ADJUST 1.5
@@ -138,14 +146,17 @@
 #define MAX_HBEAT_INTERVAL    2.0 // Seconds
 
 // Radians to degree conversion
-#define RAD2DEG(x)            180.0 * x / 3.141592
-#define DEG2RAD(x)            3.141592 * x / 180.0
+#define RAD2DEG(x)            180.0 * x / PI
+#define DEG2RAD(x)            PI * x / 180.0
 
 // Sigmoid function
 #define SIGMOID(x)            1 / (1 + exp(-5 * x))
 
+// Sign function
+#define SIGN(x)               x >= 0 ? 1 : -1
+
 // Version and device ID.
-const char* fwVersion = "25.08";
+const char* fwVersion = "25.09";
 const char* deviceId  = "MARS-HOMER";
 const char* compileDate = __DATE__ " " __TIME__;
 
@@ -171,6 +182,7 @@ bool stream = true;
 byte ctrlType = NONE;
 byte calib = NOCALIB;
 uint16union_t deviceError;
+byte mismatchCount  = 0; 
 
 // Packet Counter.
 uint16union_t packetNumber;
@@ -226,7 +238,6 @@ MPU6050 mpu(Wire);
 MPU6050 mpu2(Wire1);
 MPU6050 mpu3(Wire1);
 float imuTheta1, imuTheta2, imuTheta3, imuTheta4;
-int8_t imu1Byte, imu2Byte, imu3Byte, imu4Byte;
 
 // Endpoint kinematics of the robot.
 float xEp, yEp, zEp;

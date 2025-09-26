@@ -16,7 +16,7 @@ void readHandleIncomingMessage() {
     _details = serReader.payload[1];
     // Handle new message.
     // Check the command type.
-    if (serReader.payload[0] != 0x80) SerialUSB.println(serReader.payload[0]);
+    // if (serReader.payload[0] != 0x80) SerialUSB.println(serReader.payload[0]);
     switch (serReader.payload[0]) {
       case START_STREAM:
         stream = true;
@@ -74,6 +74,8 @@ void readHandleIncomingMessage() {
         _cmdSet = 0x01;
         break;
       case SET_LIMB:
+        // Set the limb to NOLIMB by default.
+        setLimb(NOLIMB); 
         // This can only be set if there is no error.
         if (deviceError.num != 0) break;
         // This can only be set if the control is NONE.
@@ -107,13 +109,17 @@ void readHandleIncomingMessage() {
         theta1Offset = currLimb == RIGHT ? imuTheta1 : -imuTheta1;
         theta2Offset = currLimb == RIGHT ? imuTheta2 : -imuTheta2;;
         theta3Offset = currLimb == RIGHT ? imuTheta3 : -imuTheta3;;
-        // theta4Offset = currLimb == RIGHT ? imuTheta4 : -imuTheta4;;
         theta4Offset = imuTheta4;
         // Reset encoder counts.
         angle1.write(0);
         angle2.write(0);
         angle3.write(0);
         angle4.write(0);
+        // Reset previous angles to 0.
+        theta1 = limbAngleScale * theta1Offset;
+        theta2 = limbAngleScale * theta2Offset;
+        theta3 = limbAngleScale * theta3Offset;
+        theta4 = limbAngleScale * (-theta4Offset);
         calib = YESCALIB;
         _cmdSet = 0x01;
         break;
@@ -157,10 +163,11 @@ void writeSensorStream()
   outPayload.add(theta2);
   outPayload.add(theta3);
   outPayload.add(theta4);
+  outPayload.add(imuTheta1);
+  outPayload.add(imuTheta2);
+  outPayload.add(imuTheta3);
+  outPayload.add(imuTheta4);
   outPayload.add(epForce);
-  outPayload.add(xEp);
-  outPayload.add(yEp);
-  outPayload.add(zEp);
   outPayload.add(target);
   outPayload.add(desired.val(0));
   outPayload.add(control.val(0));
@@ -179,7 +186,6 @@ void writeSensorStream()
                + 2                    // Packet number int16
                + 4                    // Run time
                + outPayload.sz() * 4  // Float sensor data
-               + 4                    // IMU angles
                + 1                    // Checksum
                );
   header[3] = getProgramStatus(streamType);
@@ -215,17 +221,7 @@ void writeSensorStream()
     bt.write(_temp);
     chksum += _temp;
   }
-
-  // Send the IMU angles
-  bt.write(imu1Byte);
-  chksum += imu1Byte;
-  bt.write(imu2Byte);
-  chksum += imu2Byte;
-  bt.write(imu3Byte);
-  chksum += imu3Byte;
-  bt.write(imu4Byte);
-  chksum += imu4Byte;
-
+  
   bt.write(chksum);
   bt.flush();
 }

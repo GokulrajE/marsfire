@@ -62,8 +62,6 @@ void updateControlLaw() {
       _currI = marsGCTorque;
       // Position control.
       _currI += limbControlScale * controlPosition();
-      SerialUSB.print("Position Control: ");
-      SerialUSB.println(_currI);
       _currPWM = convertCurrentToPWM(_currI);
       break;
   }
@@ -135,9 +133,6 @@ float controlPosition() {
     ctrlScale = 0.97 * ctrlScale + 0.03 * getControlScaleForScaledError(_currerr / POS_ERROR_DIFF_LIMIT);
   }
   ctrlScale = max(0, min(1, ctrlScale));
-  SerialUSB.print("Control Scale: ");
-  SerialUSB.println(ctrlScale);
-
   return ctrlScale * (_currp + _currd + _curri);
 }
 

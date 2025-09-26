@@ -15,15 +15,46 @@ void checkHeartbeat() {
 }
 
 /*
+ * Check encoder-imu mismatch errors
+ */
+void checkEncoderIMUMismatch() {
+  if ((calib == NOCALIB) || (abs(theta1 - imuTheta1) < IMU_MISMATCH_ERROR)) {
+    deviceError.num &= ~ANG1MISMATCHERR;
+    mismatchCount = 0;
+  } else {
+    if (mismatchCount * delTime > 0.5) {
+      deviceError.num |= ANG1MISMATCHERR;
+    } else {
+      mismatchCount++;
+    }
+  }
+}
+
+/*
+ * Check angle jump errors
+ */
+void checkEncoderJump() {
+  // Angle sensor 1 jump
+  if ((calib == NOCALIB) || (abs(theta1 - theta1Prev) < ANG_JUMP_ERROR)) {
+    deviceError.num &= ~ANG1JUMPERR;
+  } else {
+    deviceError.num |= ANG1JUMPERR;
+  }
+}
+
+/*
  * Handles errors
  */
 void handleErrors() {
   if (deviceError.num != 0) {
-    // #if SERIALUSB_DEBUG
-    //   SerialUSB.print("Error occured: ");
-    //   SerialUSB.print(deviceError.num);
-    //   SerialUSB.print("\n");
-    // #endif
     setControlType(NONE);
+  }
+  // Check if its angle related error.
+  if ((deviceError.num == ANG1MISMATCHERR)
+      || (deviceError.num == ANG234MISMATCHERR)
+      || (deviceError.num == ANG1JUMPERR)
+      || (deviceError.num == ANG234JUMPERR)) {
+    setLimb(NOLIMB);
+    calib = NOCALIB;
   }
 }

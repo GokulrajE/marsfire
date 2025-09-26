@@ -68,37 +68,4 @@ void loop() {
   runTime.num = currMilliCount - startTime;
   delTime = (currMilliCount - prevMilliCount) / 1000.0;
   prevMilliCount = currMilliCount;
-
-  // n = n + 1.0;
-
-  //  updateCalibButton();
-  //  updateEncoders();
-  //  //Serial.println("2");
-  //  updateLoadCells();
-  //  //Serial.println("3");
-  //  updateImu();
-  //  readMarsButtonState();
-  //  controller();
-   //Serial.println("4");
-
-   
-   //Serial.println("5");
-  //  readHandleIncomingMessage();
-
-  //Serial.println(IMUtheta1);
-
-//  Serial.println("1");
-//  Serial.print(time_ellapsed);
-//  Serial.print('\t');
-//  Serial.print(theta1);
-//  Serial.print('\t');
-//  Serial.print(theta2);
-//  Serial.print('\t');
-//  Serial.print(theta3);
-//  Serial.print('\t');
-  // Serial.print(time_ellapsed);
-  // Serial.print('\t');
-  // Serial.println(ax1);
-
-  // delay(10);
 }

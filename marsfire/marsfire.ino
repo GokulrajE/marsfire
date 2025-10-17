@@ -9,6 +9,8 @@ void setup() {
   Serial.begin(115200);
   bt.begin(115200);
 
+  SerialUSB.println("MARS Started");
+
   // Set the read and write resolutions
   analogReadResolution(12);
   analogWriteResolution(PWMRESOLN);
@@ -43,6 +45,7 @@ void setup() {
 
   // Last received heart beat time
   lastRxdHeartbeat = millis();
+  SerialUSB.println("All ready.");
 }
 
 void loop() {

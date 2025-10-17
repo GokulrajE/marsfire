@@ -216,6 +216,12 @@ void updateImu() {
   ax3 = mpu3.getAccX();
   ay3 = mpu3.getAccY();
   az3 = mpu3.getAccZ();
+  // SerialUSB.print(ax3);
+  // SerialUSB.print(",");
+  // SerialUSB.print(ay3);
+  // SerialUSB.print(",");
+  // SerialUSB.print(az3);
+  // SerialUSB.print(" | ");
 
   // Theta 1 (Pitch of IMU1).
   float _cosp;
@@ -232,7 +238,17 @@ void updateImu() {
   imuTheta3 -= IMU2ROLLOFFSET;
   // Theta 4 (Roll of IMU3)
   _cosp = cos(imuTheta1 - IMU3PITCHOFFSET);
-  imuTheta4 = atan2(-ax3 / _cosp, ay2 / _cosp) - imuTheta2 - imuTheta2;
+  imuTheta4 = -atan2(ax3 / _cosp, -ay3 / _cosp) - imuTheta2 - imuTheta3;
+  // SerialUSB.print(RAD2DEG(imuTheta1));
+  // SerialUSB.print(" : ");
+  // SerialUSB.print(RAD2DEG(imuTheta2));
+  // SerialUSB.print(" : ");
+  // SerialUSB.print(RAD2DEG(imuTheta3));
+  // SerialUSB.print(" : ");
+  // SerialUSB.print(RAD2DEG(imuTheta4));
+  // SerialUSB.print(" [ ");
+  // SerialUSB.print(RAD2DEG(atan2(ax3 / _cosp, -ay3 / _cosp)));
+  // SerialUSB.print(" ]\n");
   imuTheta4 -= IMU3ROLLOFFSET;
   // Change IMU angles to degree.
   imuTheta1 = RAD2DEG(imuTheta1);

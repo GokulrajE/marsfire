@@ -131,7 +131,7 @@
 #define CALIB_IMU_ANGLE_MAX   +50.0
 
 // Angle sensor error thresholds
-#define IMU_MISMATCH_ERROR    10.0    // Degrees
+#define IMU_MISMATCH_ERROR    20.0    // Degrees
 #define ANG_JUMP_ERROR        5.0     // Degrees
 
 // Control related constant
@@ -143,7 +143,7 @@
 #define L2                    0.291   // meters
 
 // Heart beat related variable
-#define MAX_HBEAT_INTERVAL    2.0 // Seconds
+#define MAX_HBEAT_INTERVAL    5.0 // Seconds
 
 // Radians to degree conversion
 #define RAD2DEG(x)            180.0 * x / PI
@@ -156,7 +156,7 @@
 #define SIGN(x)               x >= 0 ? 1 : -1
 
 // Version and device ID.
-const char* fwVersion = "25.09";
+const char* fwVersion = "25.10";
 const char* deviceId  = "MARS-HOMER";
 const char* compileDate = __DATE__ " " __TIME__;
 

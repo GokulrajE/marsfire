@@ -9,7 +9,7 @@ void setup() {
   Serial.begin(115200);
   bt.begin(115200);
 
-  SerialUSB.println("MARS Started");
+  SerialUSB.print("MARS Starting: ");
 
   // Set the read and write resolutions
   analogReadResolution(12);
@@ -36,6 +36,8 @@ void setup() {
   ctrlType = NONE;
   calib = NOCALIB;
   deviceError.num = 0x0000;
+  // No fatal error.
+  fatalError = false;
 
   // Reset packet number and run time.
   packetNumber.num = 0;
@@ -45,10 +47,24 @@ void setup() {
 
   // Last received heart beat time
   lastRxdHeartbeat = millis();
-  SerialUSB.println("All ready.");
+
+  // Set the values of pins 40 and 41
+  pinMode(SAFETY_PIN, OUTPUT);
+  // SAFETY_PIN is set to high when the robot is ready.
+  digitalWrite(SAFETY_PIN, LOW);
+  // Ready message.
+  SerialUSB.print(fwVersion);
+  SerialUSB.print(" | ");
+  SerialUSB.print(deviceId);
+  SerialUSB.print(" | ");
+  SerialUSB.print(compileDate);
+  SerialUSB.println(" | Ready.");
 }
 
 void loop() {
+  // Check for fatal error.
+  fatalError = fatalError || (deviceError.num > NOHEARTBEAT) ? true : false;
+  
   // Check heartbeat
   checkHeartbeat();
 
@@ -57,18 +73,20 @@ void loop() {
 
   // Handle errors.
   handleErrors();
-  
+
   // Update control
-  updateControlLaw();
+  if (~fatalError) updateControlLaw();
 
   // Send data out.
   writeSensorStream();
 
-  // // Relax. You only need to work at around 200Hz
-  // delay(2);
+  // Update packet number and runtime.
   packetNumber.num += 1;
   currMilliCount = millis();
   runTime.num = currMilliCount - startTime;
   delTime = (currMilliCount - prevMilliCount) / 1000.0;
   prevMilliCount = currMilliCount;
+
+  // Read handle USB Serial commands.
+  handleSerialUSBCommands();
 }

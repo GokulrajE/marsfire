@@ -117,6 +117,7 @@ void readHandleIncomingMessage() {
         angle4.write(0);
         // Reset previous angles to 0.
         theta1 = limbAngleScale * theta1Offset;
+        theta1Prev = theta1; // This to avoid triggering ANG1JUMPERR 
         theta2 = limbAngleScale * theta2Offset;
         theta3 = limbAngleScale * theta3Offset;
         theta4 = limbAngleScale * (-theta4Offset);
@@ -313,4 +314,20 @@ void parseTargetDetails(byte* payload, int strtInx, float *out) {
   inx += 4;
   _assignFloatUnionBytes(inx, payload, &temp);
   out[3] = max(MIN_TARGET_DUR, temp.num);
+}
+
+// Handle the SerialUSB commands.
+void handleSerialUSBCommands()
+{
+  if (SerialUSB.available()) {
+    if (SerialUSB.read() == '1')
+    {
+      SerialUSB.print("MARS - ");
+      SerialUSB.print(fwVersion);
+      SerialUSB.print(" | ");
+      SerialUSB.print(deviceId);
+      SerialUSB.print(" | ");
+      SerialUSB.println(compileDate);
+    }
+  }
 }

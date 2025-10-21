@@ -8,8 +8,7 @@ void _assignFloatUnionBytes(int inx, byte* bytes, floatunion_t* temp) {
 
 // Initial hardware set up the device.
 void deviceSetUp() {
-  // 1. Calibration and MARS Buttons
-  pinMode(CALIB_BUTTON, INPUT_PULLUP);
+  // 1. MARS Buttons
   pinMode(MARS_BUTTON, INPUT_PULLUP);
   
   // 2. Set up all encoders.
@@ -72,25 +71,10 @@ void updateSensorData() {
   updateImu();
 
   // Check for angle errors only after calibration has been done.
+  checkEncoder1LimitMismatch();
+  checkEncoder234LimitMismatch();
   checkEncoderIMUMismatch();
   checkEncoderJump();
-}
-
-void setSupport(int sz, int strtInx, byte* payload) {
-  int inx = strtInx;
-  floatunion_t temp;
-  _assignFloatUnionBytes(inx, payload, &temp);
-  des1 = temp.num;
-  inx += 4;
-  _assignFloatUnionBytes(inx, payload, &temp);
-  des2 = temp.num;
-  inx += 4;
-  _assignFloatUnionBytes(inx, payload, &temp);
-  des3 = temp.num;
-  inx += 4;
-  _assignFloatUnionBytes(inx, payload, &temp);
-  PCParam = temp.num;
-  inx += 4;
 }
 
 
@@ -216,12 +200,14 @@ void updateImu() {
   ax3 = mpu3.getAccX();
   ay3 = mpu3.getAccY();
   az3 = mpu3.getAccZ();
-  // SerialUSB.print(ax3);
-  // SerialUSB.print(",");
-  // SerialUSB.print(ay3);
-  // SerialUSB.print(",");
-  // SerialUSB.print(az3);
-  // SerialUSB.print(" | ");
+  #ifdef IMU_DEBUG
+    SerialUSB.print(ax3);
+    SerialUSB.print(",");
+    SerialUSB.print(ay3);
+    SerialUSB.print(",");
+    SerialUSB.print(az3);
+    SerialUSB.print(" | ");
+  #endif
 
   // Theta 1 (Pitch of IMU1).
   float _cosp;
@@ -239,16 +225,18 @@ void updateImu() {
   // Theta 4 (Roll of IMU3)
   _cosp = cos(imuTheta1 - IMU3PITCHOFFSET);
   imuTheta4 = -atan2(ax3 / _cosp, -ay3 / _cosp) - imuTheta2 - imuTheta3;
-  // SerialUSB.print(RAD2DEG(imuTheta1));
-  // SerialUSB.print(" : ");
-  // SerialUSB.print(RAD2DEG(imuTheta2));
-  // SerialUSB.print(" : ");
-  // SerialUSB.print(RAD2DEG(imuTheta3));
-  // SerialUSB.print(" : ");
-  // SerialUSB.print(RAD2DEG(imuTheta4));
-  // SerialUSB.print(" [ ");
-  // SerialUSB.print(RAD2DEG(atan2(ax3 / _cosp, -ay3 / _cosp)));
-  // SerialUSB.print(" ]\n");
+  #ifdef IMU_DEBUG
+    SerialUSB.print(RAD2DEG(imuTheta1));
+    SerialUSB.print(" : ");
+    SerialUSB.print(RAD2DEG(imuTheta2));
+    SerialUSB.print(" : ");
+    SerialUSB.print(RAD2DEG(imuTheta3));
+    SerialUSB.print(" : ");
+    SerialUSB.print(RAD2DEG(imuTheta4));
+    SerialUSB.print(" [ ");
+    SerialUSB.print(RAD2DEG(atan2(ax3 / _cosp, -ay3 / _cosp)));
+    SerialUSB.print(" ]\n");
+  #endif
   imuTheta4 -= IMU3ROLLOFFSET;
   // Change IMU angles to degree.
   imuTheta1 = RAD2DEG(imuTheta1);
@@ -257,6 +245,7 @@ void updateImu() {
   imuTheta4 = RAD2DEG(imuTheta4);
 }
 
-void updateCalibButton() {
-  calibButtonState = 1.0 * digitalRead(CALIB_BUTTON);
+
+bool isOutOfLimit(float x, float x0, float x1, float dx) {
+  return (x < (x0 - dx)) || (x > (x1 + dx));
 }

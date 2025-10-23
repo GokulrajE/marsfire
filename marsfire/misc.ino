@@ -184,7 +184,6 @@ void imuSetup() {
 
 void updateImu() {
   float ax1, ay1, az1, ax2, ay2, az2, ax3, ay3, az3;
-  float norm1, norm2, norm3, norm_sum;
 
   mpu.update();
   mpu2.update();
@@ -201,6 +200,14 @@ void updateImu() {
   ay3 = mpu3.getAccY();
   az3 = mpu3.getAccZ();
   #ifdef IMU_DEBUG
+    SerialUSB.print(currLimb);
+    SerialUSB.print(" | ");
+    SerialUSB.print(ax2);
+    SerialUSB.print(",");
+    SerialUSB.print(ay2);
+    SerialUSB.print(",");
+    SerialUSB.print(az2);
+    SerialUSB.print(" | ");
     SerialUSB.print(ax3);
     SerialUSB.print(",");
     SerialUSB.print(ay3);
@@ -209,40 +216,163 @@ void updateImu() {
     SerialUSB.print(" | ");
   #endif
 
+  // Call a different function depending on the limb.
+  if (currLimb == LEFT) computeImuAnglesLeft(ax1, ay1, az1, 
+                                             ax2, ay2, az2,
+                                             ax3, ay3, az3);
+  else computeImuAnglesRight(ax1, ay1, az1, 
+                             ax2, ay2, az2,
+                             ax3, ay3, az3);
+
+  // // Theta 1 (Pitch of IMU1).
+  // float _cosp;
+  // // Old code.
+  // // imuTheta1 = (abs(ax1) < 0.8) ? asin(ax1) : atan2(ax1, ay1 >= 0 ? norm1 : -norm1);
+  // // imuTheta1 -= IMU1PITCHOFFSET;
+  // // New code to account for Left and Right arm.
+  // norm = pow(ay1 * ay1 + az1 * az1, 0.5);
+  // imuTheta1 = atan2(ax1, norm) - IMU1PITCHOFFSET;
+
+  // // Theta 2 (Roll of IMU1).
+  // _cosp = cos(imuTheta1);
+  // imuTheta2 = atan2(-az1 / _cosp, ay1 / _cosp);
+  // // Correct for left/right arm.
+  // imuTheta2 -= IMU1ROLLOFFSET;
+
+  // // Theta 3 (Roll of IMU2)
+  // norm = pow(ay2 * ay2 + az2 * az2, 0.5);
+  // _cosp = cos(atan2(ax2, norm));
+  // imuTheta3 = atan2(-az2 / _cosp, ay2 / _cosp);
+  // // Correct for left/right arm.
+  // imuTheta3 -=  imuTheta2;
+  // imuTheta3 -= IMU2ROLLOFFSET;
+
+  // // Theta 4 (Roll of IMU3)
+  // if (currLimb == LEFT)
+  // {
+  //   norm = pow(ax3 * ax3 + ay3 * ay3, 0.5);
+  //   _cosp = cos(atan2(az3, norm));
+  //   imuTheta4 = atan2(-ax3 / _cosp, -ay3 / _cosp);
+  // }
+  // else
+  // {
+  //   norm = pow(ax3 * ax3 + ay3 * ay3, 0.5);
+  //   _cosp = cos(atan2(-az3, norm));
+  //   imuTheta4 = atan2(-ax3 / _cosp, ay3 / _cosp);
+  // }
+  // // Correct for left/right arm.
+  // imuTheta4 -=  imuTheta2;
+  // imuTheta4 -=  imuTheta3;
+  // imuTheta4 -= IMU3ROLLOFFSET;
+  // #ifdef IMU_DEBUG
+  //   SerialUSB.print(RAD2DEG(imuTheta1));
+  //   SerialUSB.print(" : ");
+  //   SerialUSB.print(RAD2DEG(imuTheta2));
+  //   SerialUSB.print(" : ");
+  //   SerialUSB.print(RAD2DEG(imuTheta3));
+  //   SerialUSB.print(" : ");
+  //   SerialUSB.print(RAD2DEG(imuTheta4));
+  //   SerialUSB.print("\n");
+  // #endif
+  // // Change IMU angles to degree.
+  // imuTheta1 = RAD2DEG(imuTheta1);
+  // imuTheta2 = RAD2DEG(imuTheta2);
+  // imuTheta3 = RAD2DEG(imuTheta3);
+  // imuTheta4 = RAD2DEG(imuTheta4);
+}
+
+void computeImuAnglesLeft(float ax1, float ay1, float az1, 
+                          float ax2, float ay2, float az2,
+                          float ax3, float ay3, float az3)
+{
   // Theta 1 (Pitch of IMU1).
-  float _cosp;
-  norm1 = pow(ay1 * ay1 + az1 * az1, 0.5);
-  imuTheta1 = (abs(ax1) < 0.8) ? asin(ax1) : atan2(ax1, ay1 >= 0 ? norm1 : -norm1);
-  imuTheta1 -= IMU1PITCHOFFSET;
+  float norm = pow(ay1 * ay1 + az1 * az1, 0.5);
+  imuTheta1 = atan2(ax1, norm) - IMU1PITCHOFFSET;
+
   // Theta 2 (Roll of IMU1).
-  _cosp = cos(imuTheta1);
-  imuTheta2 = atan2(az1 / _cosp, ay1 / _cosp);
+  float _cosp = cos(imuTheta1);
+  imuTheta2 = atan2(-az1 / _cosp, ay1 / _cosp);
   imuTheta2 -= IMU1ROLLOFFSET;
-  // Theta 2 (Roll of IMU2)
-  _cosp = cos(imuTheta1 - IMU2PITCHOFFSET);
-  imuTheta3 = atan2(az2 / _cosp, ay2 / _cosp) - imuTheta2;
+  imuTheta2 *= -1;
+
+  // Theta 3 (Roll of IMU2)
+  norm = pow(ay2 * ay2 + az2 * az2, 0.5);
+  _cosp = cos(atan2(ax2, norm));
+  imuTheta3 = atan2(-az2 / _cosp, ay2 / _cosp);
   imuTheta3 -= IMU2ROLLOFFSET;
+  imuTheta3 *= -1;
+  imuTheta3 -=  imuTheta2;
+
   // Theta 4 (Roll of IMU3)
-  _cosp = cos(imuTheta1 - IMU3PITCHOFFSET);
-  imuTheta4 = -atan2(ax3 / _cosp, -ay3 / _cosp) - imuTheta2 - imuTheta3;
-  #ifdef IMU_DEBUG
-    SerialUSB.print(RAD2DEG(imuTheta1));
-    SerialUSB.print(" : ");
-    SerialUSB.print(RAD2DEG(imuTheta2));
-    SerialUSB.print(" : ");
-    SerialUSB.print(RAD2DEG(imuTheta3));
-    SerialUSB.print(" : ");
-    SerialUSB.print(RAD2DEG(imuTheta4));
-    SerialUSB.print(" [ ");
-    SerialUSB.print(RAD2DEG(atan2(ax3 / _cosp, -ay3 / _cosp)));
-    SerialUSB.print(" ]\n");
-  #endif
+  norm = pow(ax3 * ax3 + ay3 * ay3, 0.5);
+  _cosp = cos(atan2(az3, norm));
+  imuTheta4 = atan2(-ax3 / _cosp, -ay3 / _cosp);
+  imuTheta4 -=  imuTheta2;
+  imuTheta4 -=  imuTheta3;
   imuTheta4 -= IMU3ROLLOFFSET;
+  
   // Change IMU angles to degree.
   imuTheta1 = RAD2DEG(imuTheta1);
   imuTheta2 = RAD2DEG(imuTheta2);
   imuTheta3 = RAD2DEG(imuTheta3);
   imuTheta4 = RAD2DEG(imuTheta4);
+
+  #ifdef IMU_DEBUG
+    SerialUSB.print(imuTheta1);
+    SerialUSB.print(" : ");
+    SerialUSB.print(imuTheta2);
+    SerialUSB.print(" : ");
+    SerialUSB.print(imuTheta3);
+    SerialUSB.print(" : ");
+    SerialUSB.print(imuTheta4);
+    SerialUSB.print("\n");
+  #endif
+}
+
+void computeImuAnglesRight(float ax1, float ay1, float az1, 
+                           float ax2, float ay2, float az2,
+                           float ax3, float ay3, float az3)
+{
+  // Theta 1 (Pitch of IMU1).
+  float _cosp;
+  float norm = pow(ay1 * ay1 + az1 * az1, 0.5);
+  imuTheta1 = atan2(ax1, norm) - IMU1PITCHOFFSET;
+
+  // Theta 2 (Roll of IMU1).
+  _cosp = cos(imuTheta1);
+  imuTheta2 = atan2(-az1 / _cosp, ay1 / _cosp);
+  imuTheta2 -= IMU1ROLLOFFSET;
+
+  // Theta 3 (Roll of IMU2)
+  norm = pow(ay2 * ay2 + az2 * az2, 0.5);
+  _cosp = cos(atan2(ax2, norm));
+  imuTheta3 = atan2(-az2 / _cosp, ay2 / _cosp);
+  imuTheta3 -=  imuTheta2;
+  imuTheta3 -= IMU2ROLLOFFSET;
+
+  // Theta 4 (Roll of IMU3)
+  norm = pow(ax3 * ax3 + ay3 * ay3, 0.5);
+  _cosp = cos(atan2(-az3, norm));
+  imuTheta4 = atan2(-ax3 / _cosp, ay3 / _cosp);
+  imuTheta4 -=  imuTheta2;
+  imuTheta4 -=  imuTheta3;
+  imuTheta4 -= IMU3ROLLOFFSET;
+
+  // Change IMU angles to degree.
+  imuTheta1 = RAD2DEG(imuTheta1);
+  imuTheta2 = RAD2DEG(imuTheta2);
+  imuTheta3 = RAD2DEG(imuTheta3);
+  imuTheta4 = RAD2DEG(imuTheta4);
+  #ifdef IMU_DEBUG
+    SerialUSB.print(imuTheta1);
+    SerialUSB.print(" : ");
+    SerialUSB.print(imuTheta2);
+    SerialUSB.print(" : ");
+    SerialUSB.print(imuTheta3);
+    SerialUSB.print(" : ");
+    SerialUSB.print(imuTheta4);
+    SerialUSB.print("\n");
+  #endif
 }
 
 

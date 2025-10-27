@@ -172,7 +172,7 @@
 #define SIGN(x)                   x >= 0 ? 1 : -1
 
 // Version and device ID.
-const char* fwVersion = "h1.0.0";
+const char* fwVersion = "h1.0.1";
 const char* deviceId  = "MARS-HOMER";
 const char* compileDate = __DATE__ " " __TIME__;
 

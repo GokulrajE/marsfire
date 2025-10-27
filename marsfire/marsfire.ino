@@ -67,7 +67,7 @@ void loop() {
   
   // Check heartbeat
   checkHeartbeat();
-
+  
   // Read and update sensor values.
   updateSensorData();
 

@@ -15,7 +15,7 @@
 
 // Define the PIN numbers
 // #define IMU_DEBUG
-
+#define LASER_PIN                 28
 #define SAFETY_PIN                40
 #define MARS_BUTTON               20
 #define MOTOR_PWM                 37
@@ -137,7 +137,7 @@
 #define ANGLE1_MIN_LIMIT          -100.0  // Degrees
 #define ANGLE1_MAX_LIMIT          +010.0  // Degrees
 #define ANGLE2_MIN_LIMIT          -035.0  // Degrees
-#define ANGLE2_MAX_LIMIT          +035.0  // Degrees
+#define ANGLE2_MAX_LIMIT          +045.0  // Degrees
 #define ANGLE3_MIN_LIMIT          -160.0  // Degrees
 #define ANGLE3_MAX_LIMIT          +160.0  // Degrees
 #define ANGLE4_MIN_LIMIT          -300.0  // Degrees

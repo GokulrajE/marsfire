@@ -8,8 +8,7 @@ void _assignFloatUnionBytes(int inx, byte* bytes, floatunion_t* temp) {
 
 // Initial hardware set up the device.
 void deviceSetUp() {
-  // 1. Calibration and MARS Buttons
-  pinMode(CALIB_BUTTON, INPUT_PULLUP);
+  // 1. MARS Buttons
   pinMode(MARS_BUTTON, INPUT_PULLUP);
   
   // 2. Set up all encoders.
@@ -45,9 +44,7 @@ void deviceSetUp() {
 void updateSensorData() {
   // 1. Read the force sensors.
   scale1.update();
-  epForce = -scale1.getData();
-  // scale2.update();
-  // force2 = scale2.getData();
+  epForce = scale1.getData();
 
   // 2. Read the encoder data.
   // Update previous values.
@@ -60,71 +57,24 @@ void updateSensorData() {
   theta2 = limbAngleScale * (read_angle2() + theta2Offset);
   theta3 = limbAngleScale * (read_angle3() + theta3Offset);
   theta4 = limbAngleScale * (read_angle4() - theta4Offset);
-  // Angle in radians.
-  theta1r = DEG2RAD(theta1);
-  theta2r = DEG2RAD(theta2);
-  theta3r = DEG2RAD(theta3);
-  theta4r = DEG2RAD(theta4);
-  // Cosine and Sine terms.
-  cos1 = cos(theta1r);
-  cos2 = cos(theta2r);
-  cos3 = cos(theta3r);
-  cos4 = cos(theta4r);
-  sin1 = sin(theta1r);
-  sin2 = sin(theta2r);
-  sin3 = sin(theta3r);
-  sin4 = sin(theta4r);
+  
   // 2a. Update actual angle buffer
   actual.add(theta1);
   // 2b. Compute the angular velocities
   omega1 = (theta1 - theta1Prev) / delTime;
-  omega2 = (theta2 - theta2Prev) / delTime;
-  omega3 = (theta3 - theta3Prev) / delTime;
-  omega4 = (theta4 - theta4Prev) / delTime;
 
   // 3. Read buttons.
   marsButton = updatButtonPressValue(MARS_BUTTON, &marsBounceCount, marsButton);
-  calibButton = updatButtonPressValue(CALIB_BUTTON, &calibBounceCount, calibButton);
-  devButtons = (calibButton << 1) | marsButton;
+  devButtons = marsButton;
 
   // 4. Read IMU data.
   updateImu();
 
-  // 5. Compute robot endpoint position.
-  updateEndpointPosition();
-
-  // 6. Compute the human limb joint angles. 
-  updateHumanJointAngles();
-
-  // 7. Update the current torque and rate of change of torque.
-  // Adjust enpoint force
-  // Adjust for the weight of the arm rest.
-  epForce += ARM_REST_WEIGHT * sin1;
-  torquePrev = torque;
-  momentArm = sqrt(xEp * xEp + yEp * yEp);
-  torque = epForce * momentArm;
-  dTorque = (torque - torquePrev) / delTime;
-
-  // Compute human limb torque.
-  hLimbTorque = ctrlType != AWS ? 0.0 : getHumanJointTorque();
-}
-
-
-void setSupport(int sz, int strtInx, byte* payload) {
-  int inx = strtInx;
-  floatunion_t temp;
-  _assignFloatUnionBytes(inx, payload, &temp);
-  des1 = temp.num;
-  inx += 4;
-  _assignFloatUnionBytes(inx, payload, &temp);
-  des2 = temp.num;
-  inx += 4;
-  _assignFloatUnionBytes(inx, payload, &temp);
-  des3 = temp.num;
-  inx += 4;
-  _assignFloatUnionBytes(inx, payload, &temp);
-  PCParam = temp.num;
-  inx += 4;
+  // Check for angle errors only after calibration has been done.
+  checkEncoder1LimitMismatch();
+  checkEncoder234LimitMismatch();
+  checkEncoderIMUMismatch();
+  checkEncoderJump();
 }
 
 
@@ -135,8 +85,8 @@ byte getProgramStatus(byte dtype) {
 
 
 byte getAdditionalInfo(void) {
-  // CMD_STATUS | CMD_STATUS | CALIB | MARS | LIMBDYNPARAM | LIMBKINPARAM | CURR LIMB | CURR LIMB
-  return (cmdStatus << 6) | (devButtons << 4) | (limbDynParam << 3) | (limbKinParam << 2) | currLimb;
+  // CMD_STATUS | CMD_STATUS | CALIB | MARS | x | x | CURR LIMB | CURR LIMB
+  return (cmdStatus << 6) | (devButtons << 4) | currLimb;
 }
 
 void setLimb(byte limb) {
@@ -173,36 +123,6 @@ byte updatButtonPressValue(byte pinNo, int8_t* bounceCount, byte buttonValue) {
   else if (*bounceCount >= BOUNCE_THRESHOLD) return 1;
   else return buttonValue;
 }
-
-
-// void readMarsButtonState(void) {
-//    button.update();                  // Update the Bounce instance
-//    marsButton = button.read();
-// }
-
-// void updateEncoders()
-// {
-//   theta1Enc = read_angle1();
-//   theta2Enc = read_angle2();
-//   theta3Enc = read_angle3();
-//   theta4Enc = read_angle4();
-
-//   theta1 = theta1Enc + offset1;
-//   theta2 = theta2Enc + offset2;
-//   theta3 = theta3Enc + offset3;
-//   theta4 = theta4Enc + offset4;
-
-// }
-
-// void updateLoadCells()
-// {
-//   scale1.update();
-//   force1 = -scale1.getData();
-
-//   scale2.update();
-//   force2 = scale2.getData();
-
-// }
 
 float read_angle1() {
   _enccount1 = angle1.read();
@@ -264,57 +184,159 @@ void imuSetup() {
 
 void updateImu() {
   float ax1, ay1, az1, ax2, ay2, az2, ax3, ay3, az3;
-  float norm1, norm2, norm3, norm_sum;
 
   mpu.update();
   mpu2.update();
   mpu3.update();
 
+  // Read IMUs
   ax1 = mpu.getAccX();
   ay1 = mpu.getAccY();
   az1 = mpu.getAccZ();
-
   ax2 = mpu2.getAccX();
   ay2 = mpu2.getAccY();
   az2 = mpu2.getAccZ();
-
   ax3 = mpu3.getAccX();
   ay3 = mpu3.getAccY();
   az3 = mpu3.getAccZ();
+  #ifdef IMU_DEBUG
+    SerialUSB.print(currLimb);
+    SerialUSB.print(" | ");
+    SerialUSB.print(ax1);
+    SerialUSB.print(",");
+    SerialUSB.print(ay1);
+    SerialUSB.print(",");
+    SerialUSB.print(az1);
+    SerialUSB.print(" | ");
+    SerialUSB.print(ax2);
+    SerialUSB.print(",");
+    SerialUSB.print(ay2);
+    SerialUSB.print(",");
+    SerialUSB.print(az2);
+    SerialUSB.print(" | ");
+    SerialUSB.print(ax3);
+    SerialUSB.print(",");
+    SerialUSB.print(ay3);
+    SerialUSB.print(",");
+    SerialUSB.print(az3);
+    SerialUSB.print(" | ");
+  #endif
 
-  norm1 = pow(ax1 * ax1 + ay1 * ay1, 0.5);
-  norm2 = pow(ax2 * ax2 + ay2 * ay2, 0.5);
-  norm3 = pow(ay3 * ay3 + az3 * az3, 0.5);
-  norm_sum = norm1 + norm2;
-
-  // Theta 1.
-  imuTheta1 = (norm1 * RAD2DEG(atan2(ax1, ay1))
-               + norm2 * RAD2DEG(atan2(ax2, ay2))) / norm_sum;
-  // SerialUSB.print(imuTheta1);
-  // SerialUSB.print(",");
-  imuTheta1 -= IMU1OFFSET; 
-  // SerialUSB.print(imuTheta1);
-  // SerialUSB.print("\n");
-  imuTheta2 = RAD2DEG(atan2(-az1, norm1));
-  imuTheta2 -= IMU2OFFSET; 
-  imuTheta3 = RAD2DEG(atan2(-az2, norm2)) - imuTheta2;
-  imuTheta3 -= IMU3OFFSET; 
-  imuTheta4 = RAD2DEG(atan2(-ax3, norm3)) - imuTheta2 - imuTheta3;
-  imuTheta4 -= IMU4OFFSET; 
-
-  // Update the IMU angle bytes
-  imu1Byte = (int8_t) imuTheta1;
-  imu2Byte = (int8_t) imuTheta2;
-  imu3Byte = (int8_t) imuTheta3;
-  imu4Byte = (int8_t) imuTheta4;
+  // Call a different function depending on the limb.
+  if (currLimb == LEFT) computeImuAnglesLeft(ax1, ay1, az1, 
+                                             ax2, ay2, az2,
+                                             ax3, ay3, az3);
+  else computeImuAnglesRight(ax1, ay1, az1, 
+                             ax2, ay2, az2,
+                             ax3, ay3, az3);
 }
 
-// void calibButtonSetup()
-// {
-//   pinMode(CALIB_BUTTON, INPUT_PULLUP);
-// }
+void computeImuAnglesLeft(float ax1, float ay1, float az1, 
+                          float ax2, float ay2, float az2,
+                          float ax3, float ay3, float az3)
+{
+  // Theta 1 (Pitch of IMU1).
+  float norm = pow(ay1 * ay1 + az1 * az1, 0.5);
+  imuTheta1 = atan2(ax1, norm) - IMU1PITCHOFFSET;
 
-void updateCalibButton() {
-  calibButtonState = 1.0 * digitalRead(CALIB_BUTTON);
-  // Serial.println(digitalRead(calib_button_pin));
+  // Theta 2 (Roll of IMU1).
+  float _cosp = cos(imuTheta1);
+  imuTheta2 = atan2(-az1 / _cosp, ay1 / _cosp);
+  imuTheta2 -= IMU1ROLLOFFSET;
+  imuTheta2 *= -1;
+
+  // Theta 3 (Roll of IMU2)
+  norm = pow(ay2 * ay2 + az2 * az2, 0.5);
+  _cosp = cos(atan2(ax2, norm));
+  imuTheta3 = atan2(-az2 / _cosp, ay2 / _cosp);
+  imuTheta3 -= IMU2ROLLOFFSET;
+  imuTheta3 *= -1;
+  imuTheta3 -=  imuTheta2;
+
+  // Theta 4 (Roll of IMU3)
+  norm = pow(ax3 * ax3 + ay3 * ay3, 0.5);
+  _cosp = cos(atan2(-az3, norm));
+  #ifdef IMU_DEBUG
+    SerialUSB.print(" [ ");
+    SerialUSB.print(RAD2DEG(atan2(-az3, norm)));
+    SerialUSB.print(" ] ");
+  #endif
+  imuTheta4 = atan2(-ax3 / _cosp, ay3 / _cosp);
+  imuTheta4 *= -1;
+  imuTheta4 -=  imuTheta2;
+  imuTheta4 -=  imuTheta3;
+  imuTheta4 -= IMU3ROLLOFFSET;
+  
+  // Change IMU angles to degree.
+  imuTheta1 = RAD2DEG(imuTheta1);
+  imuTheta2 = RAD2DEG(imuTheta2);
+  imuTheta3 = RAD2DEG(imuTheta3);
+  imuTheta4 = RAD2DEG(imuTheta4);
+
+  #ifdef IMU_DEBUG
+    SerialUSB.print(imuTheta1);
+    SerialUSB.print(" : ");
+    SerialUSB.print(imuTheta2);
+    SerialUSB.print(" : ");
+    SerialUSB.print(imuTheta3);
+    SerialUSB.print(" : ");
+    SerialUSB.print(imuTheta4);
+    SerialUSB.print("\n");
+  #endif
+}
+
+void computeImuAnglesRight(float ax1, float ay1, float az1, 
+                           float ax2, float ay2, float az2,
+                           float ax3, float ay3, float az3)
+{
+  // Theta 1 (Pitch of IMU1).
+  float _cosp;
+  float norm = pow(ay1 * ay1 + az1 * az1, 0.5);
+  imuTheta1 = atan2(ax1, norm) - IMU1PITCHOFFSET;
+
+  // Theta 2 (Roll of IMU1).
+  _cosp = cos(imuTheta1);
+  imuTheta2 = atan2(-az1 / _cosp, ay1 / _cosp);
+  imuTheta2 -= IMU1ROLLOFFSET;
+
+  // Theta 3 (Roll of IMU2)
+  norm = pow(ay2 * ay2 + az2 * az2, 0.5);
+  _cosp = cos(atan2(ax2, norm));
+  imuTheta3 = atan2(-az2 / _cosp, ay2 / _cosp);
+  imuTheta3 -=  imuTheta2;
+  imuTheta3 -= IMU2ROLLOFFSET;
+
+  // Theta 4 (Roll of IMU3)
+  norm = pow(ax3 * ax3 + ay3 * ay3, 0.5);
+  _cosp = cos(atan2(-az3, norm));
+  #ifdef IMU_DEBUG
+    SerialUSB.print(" [ ");
+    SerialUSB.print(RAD2DEG(atan2(-az3, norm)));
+    SerialUSB.print(" ] ");
+  #endif
+  imuTheta4 = atan2(-ax3 / _cosp, ay3 / _cosp);
+  imuTheta4 -=  imuTheta2;
+  imuTheta4 -=  imuTheta3;
+  imuTheta4 -= IMU3ROLLOFFSET;
+
+  // Change IMU angles to degree.
+  imuTheta1 = RAD2DEG(imuTheta1);
+  imuTheta2 = RAD2DEG(imuTheta2);
+  imuTheta3 = RAD2DEG(imuTheta3);
+  imuTheta4 = RAD2DEG(imuTheta4);
+  #ifdef IMU_DEBUG
+    SerialUSB.print(imuTheta1);
+    SerialUSB.print(" : ");
+    SerialUSB.print(imuTheta2);
+    SerialUSB.print(" : ");
+    SerialUSB.print(imuTheta3);
+    SerialUSB.print(" : ");
+    SerialUSB.print(imuTheta4);
+    SerialUSB.print("\n");
+  #endif
+}
+
+
+bool isOutOfLimit(float x, float x0, float x1, float dx) {
+  return (x < (x0 - dx)) || (x > (x1 + dx));
 }

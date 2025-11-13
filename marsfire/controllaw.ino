@@ -11,9 +11,6 @@
 // This function will allow us to set a new control type only from the NONE
 // control type. It does not allow transition between control modes.
 bool setControlType(byte ctype) {
-  // Reset beta and transition torque.
-  beta = 0;
-  transitionTorque = 0;
   // We want to change the current control type to NONE. No problem. Just
   // change it and leave.
   if (ctype == NONE) {
@@ -29,77 +26,12 @@ bool setControlType(byte ctype) {
   // Alright, the current control model is NONE.
   switch (ctype) {
     case POSITION:
-    case TORQUE:
       // Nothing needs to be set.
-      ctrlType = ctype;
-      break;
-    case AWS:
-      // Upper-limb kinematic and dynamic parameters need to set.
-      if ((limbKinParam == NOLIMBKINPARAM) || (limbDynParam == NOLIMBDYNPARAM)) return false;
       ctrlType = ctype;
       break;
   }
   target = INVALID_TARGET;
   desired.add(INVALID_TARGET);
-  return true;
-}
-
-// Transition control between POSITION and AWS. This is necessary for helping the 
-// subject relax when in the rest state.
-bool transitionControl(byte* payload, int strtInx) {
-  // First byte in the payload is the new control type.
-  // If this matches the current control type, then do nothing.
-  if (ctrlType == payload[strtInx]) {
-    return false;
-  }
-  
-  // Its different.
-  byte _ctrlType = payload[strtInx];
-
-  // Read the target information.
-  parseTargetDetails(serReader.payload, strtInx + 1, tempArray);
-  // Check that the target is within the appropriate limits.
-  // tempArray[2] has the target value.
-  if ((_ctrlType == POSITION) && 
-      (isWithinRange(tempArray[2], POSITION_TARGET_MIN, POSITION_TARGET_MAX) == false)) return false;
-  if ((_ctrlType == AWS) &&
-      (isWithinRange(tempArray[2], AWS_TARGET_MIN, AWS_TARGET_MAX) == false)) return false;
-  
-  // Set control type
-  ctrlType = _ctrlType;
-  
-  // Set target.
-  strtPos = ctrlType == AWS ? 1.0 : actual.val(0);
-  strtTime = tempArray[1];
-  target = tempArray[2];
-  tgtDur = tempArray[3];
-
-  // Initial time.
-  initTime = runTime.num / 1000.0f + strtTime;
-  
-  // Set the current target set time.
-  targetSetTime = runTime.num;
-
-  // Record the transition torque.
-  beta = 1.0;
-  transitionTorque = torque;
-
-  // SerialUSB.print("Transition Ctrl: ");
-  // SerialUSB.print(ctrlType);
-  // SerialUSB.print(", ");
-  // SerialUSB.print(strtPos);
-  // SerialUSB.print(", ");
-  // SerialUSB.print(strtTime);
-  // SerialUSB.print(", ");
-  // SerialUSB.print(target);
-  // SerialUSB.print(", ");
-  // SerialUSB.print(tgtDur);
-  // SerialUSB.print(", ");
-  // SerialUSB.print(beta);
-  // SerialUSB.print(", ");
-  // SerialUSB.print(transitionTorque);
-  // SerialUSB.print("\n");
-
   return true;
 }
 
@@ -128,39 +60,8 @@ void updateControlLaw() {
       // MARS gravity compensation torque
       marsGCTorque = MARS_GRAV_COMP_ADJUST * limbControlScale * getMarsGravityCompensationTorque() / MOTOR_T2I;
       _currI = marsGCTorque;
-      // Transition torque weightage.
-      beta = beta < 0.001 ? 0.0 : beta * AWS_TRANS_FACTOR;
       // Position control.
-      _currI += beta * ( - MARS_GRAV_COMP_ADJUST * transitionTorque / MOTOR_T2I) + (1 - beta) * limbControlScale * controlPosition();
-      SerialUSB.print("Position Control: ");
-      SerialUSB.println(_currI);
-      _currPWM = convertCurrentToPWM(_currI);
-      break;
-    case TORQUE:
-    case AWS:
-      // Update desired position based on the control type.
-      float _torqtgt;
-      if (ctrlType == TORQUE) {
-        _torqtgt = getDesiredTorqueValue();
-      } else {
-        // Get the weight support target.
-        float _awstgt = getDesiredAWSTarget();
-        // Compute the torque target.
-        beta = beta < 0.001 ? 0.0 : beta * AWS_TRANS_FACTOR;
-        _torqtgt = beta * transitionTorque + (1 - beta) * AWS_SCALE_FACTOR * _awstgt * hLimbTorque;
-      }
-      // float _torqtgt = ctrlType == TORQUE ? getDesiredTorqueValue() : getDesiredAWSTarget();
-      // Scale target down based on moment arm and robot's flexion angle.
-      float _scaleMA = SIGMOID((momentArm - TORQTGT_SIG_MA_MID) / TORQTGT_SIG_MA_SPRD);
-      float _scaleShFlex = SIGMOID((theta1 - TORQTGT_SIG_FLX_MID) / TORQTGT_SIG_FLX_SPRD);
-      desired.add(_scaleShFlex * _scaleMA * _torqtgt);
-      // Add the MARS gravity compensation torque
-      marsGCTorque = MARS_GRAV_COMP_ADJUST * limbControlScale * getMarsGravityCompensationTorque() / MOTOR_T2I;
-      _currI = - marsGCTorque;
-      // Feedforward torque.
-      _currI += 0.5 * limbControlScale * desired.val(0);
-      // Torque PD control.
-      _currI += limbControlScale * controlTorque();
+      _currI += limbControlScale * controlPosition();
       _currPWM = convertCurrentToPWM(_currI);
       break;
   }
@@ -197,7 +98,7 @@ float controlPosition() {
   // Update error related information.
   // Current error: Limit the error to be between +/- POS_ERROR_DIFF_LIMIT
   // _currerr = min(POS_ERROR_DIFF_LIMIT, max(-POS_ERROR_DIFF_LIMIT, _currtgt - _currang));
-  _currerr = _currtgt - _currang; // softLimit(_currtgt - _currang, POS_ERROR_DIFF_LIMIT);
+  _currerr = _currtgt - _currang;
   // Ignore small errors.
   _currerr = (abs((_currerr)) <= POS_CTRL_DBAND) ? 0.0 : _currerr;
   // Proportional control term.
@@ -225,62 +126,16 @@ float controlPosition() {
   errsum = _currp + _currd;
 
   // Error based scaling of control output.
-  ctrlScale = 0.99 * ctrlScale + 0.01 * getControlScaleForScaledError(_currerr / POS_ERROR_DIFF_LIMIT);
+  // Have different fall and rise times.
+  if (getControlScaleForScaledError(_currerr / POS_ERROR_DIFF_LIMIT) < ctrlScale) {
+    ctrlScale = 0.9 * ctrlScale + 0.1 * getControlScaleForScaledError(_currerr / POS_ERROR_DIFF_LIMIT);
+  } else {
+    ctrlScale = 0.97 * ctrlScale + 0.03 * getControlScaleForScaledError(_currerr / POS_ERROR_DIFF_LIMIT);
+  }
   ctrlScale = max(0, min(1, ctrlScale));
-  SerialUSB.print("Control Scale: ");
-  SerialUSB.println(ctrlScale);
-
   return ctrlScale * (_currp + _currd + _curri);
 }
 
-float controlTorque() {
-  float _currtorq = torque;
-  float _currtgt = desired.val(0);
-  float _prevtorq = torquePrev;
-  float _prevtgt = desired.val(1);
-  float _currp, _currd, _curri;
-  float _currerr, _preverr;
-  float _errsum = errsum;
-  
-  // // Check if position control is disabled, or we should have valid 
-  // // current and previous desired positions. 
-  if ((_currtgt == INVALID_TARGET) || (_prevtgt == INVALID_TARGET)) {
-    err = 0.0;
-    errdiff = 0.0;
-    errsum = 0.0;
-    return 0.0;
-  }
-
-  // Update error related information.
-  // Current error
-  _currerr = _currtgt - _currtorq;
-  // Ignore small errors.
-  _currerr = (abs((_currerr)) <= TORQUE_CTRL_DBAND) ? 0.0 : _currerr;
-  // Proportional control term.
-  _currp = tcKp * (_currerr);
-
-  // Previous error
-  _preverr = (_prevtgt != INVALID_TARGET) ? _prevtgt - _prevtorq : _currerr;
-  // Derivate control term.
-  _currd = tcKd * (_currerr - _preverr);
-
-  // Error sum.
-  if (tcKi == 0) _curri = 0;
-  else {
-    _errsum = 0.9999 * _errsum + _currerr;
-    float _intlim = INTEGRATOR_LIMIT / tcKi;
-    _errsum = min(_intlim, max(-_intlim, _errsum));
-    // Integral control term.
-    _curri = tcKi * _errsum;
-  }
-
-  // Log error information
-  err = _currp;
-  errdiff = _currd;
-  errsum = _curri;
-
-  return _currp + _currd + _curri;
-}
 
 // Bound the position control output.
 float boundPositionControl(float pwm_value) {
@@ -319,16 +174,8 @@ float dampenControlForSafety(float currPWM, byte cType, byte currLimb) {
         _vel = omega1 / 5.0;
         break;
       case POSITION:
-        _bDamp = 5 * SAFETY_DAMP_VALUE;
+        _bDamp = SAFETY_DAMP_VALUE;
         _vel = omega1 / 5.0;
-      case TORQUE:
-        _bDamp = omega1 > SAFETY_DAMP_VEL_TH ? SAFETY_DAMP_VALUE : 0.0;
-        _vel = (omega1 - SAFETY_DAMP_VEL_TH) / 5.0;
-        break;
-      case AWS:
-        _bDamp = 2.0 * SAFETY_DAMP_VALUE;
-        _vel = omega1 / 5.0;
-        break;
     }
   }
   currPWM += - limbControlScale * _bDamp * _sign * _vel * _vel;
@@ -383,21 +230,6 @@ float getDesiredPositionValue() {
   return min(POSITION_TARGET_MAX, max(POSITION_TARGET_MIN, _tgt));
 }
 
-// Compute the desired torque target value.
-float getDesiredTorqueValue() {
-  if (target == INVALID_TARGET) return 0.0;
-  float _t = runTime.num / 1000.0f;
-  float _tgt = strtPos + (target - strtPos) * mjt((_t - initTime) / tgtDur);
-  return min(TORQUE_TARGET_MAX, max(TORQUE_TARGET_MIN, _tgt));
-}
-
-// Compute the desired AWS target value.
-float getDesiredAWSTarget() {
-  float _t = runTime.num / 1000.0f;
-  float _tgt = strtPos + (target - strtPos) * mjt((_t - initTime) / tgtDur);
-  return min(AWS_TARGET_MAX, max(AWS_TARGET_MIN, _tgt));
-}
-
 // Soft limit.
 float softLimit(float x, float xScale) {
   return xScale * (2 * SIGMOID(x / xScale) - 1);
@@ -409,14 +241,5 @@ float getControlScaleForScaledError(float errScaled) {
   float _left = SIGMOID(2 * (errScaled + 1.25));
   // Right sigmoid
   float _right = SIGMOID(2 * (errScaled - 1.25));
-  return (0.98 * (_left - _right) + 0.02);
+  return (0.96 * (_left - _right) + 0.04);
 }
-
-// Desired torque scaler.
-
-
-// float updateTargetPosition() {
-//   if (target == INVALID_TARGET) return actual.val(0);
-//   float _t = runTime.num / 1000.0f;
-//   return strtPos + (target - strtPos) * mjt((_t - initTime) / reachDur);
-// }

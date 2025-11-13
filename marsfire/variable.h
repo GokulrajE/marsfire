@@ -136,7 +136,7 @@
 // Angle limits.
 #define ANGLE1_MIN_LIMIT          -100.0  // Degrees
 #define ANGLE1_MAX_LIMIT          +010.0  // Degrees
-#define ANGLE2_MIN_LIMIT          -035.0  // Degrees
+#define ANGLE2_MIN_LIMIT          -045.0  // Degrees
 #define ANGLE2_MAX_LIMIT          +045.0  // Degrees
 #define ANGLE3_MIN_LIMIT          -160.0  // Degrees
 #define ANGLE3_MAX_LIMIT          +160.0  // Degrees

@@ -68,12 +68,12 @@ void updateSensorData() {
   devButtons = marsButton;
 
   // 4. Read IMU data.
-  updateImu();
+  if(ctrlType != POSITION)updateImu();
 
   // Check for angle errors only after calibration has been done.
-  checkEncoder1LimitMismatch();
+  // checkEncoder1LimitMismatch();
   checkEncoder234LimitMismatch();
-  checkEncoderIMUMismatch();
+  // checkEncoderIMUMismatch();
   checkEncoderJump();
 }
 

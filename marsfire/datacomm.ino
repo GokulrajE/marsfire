@@ -107,9 +107,9 @@ void readHandleIncomingMessage() {
             (imuTheta4 > CALIB_IMU_ANGLE_MAX)) break;
         // Set the offset angles.
         theta1Offset = currLimb == RIGHT ? imuTheta1 : -imuTheta1;
-        theta2Offset = currLimb == RIGHT ? imuTheta2 : -imuTheta2;;
-        theta3Offset = currLimb == RIGHT ? imuTheta3 : -imuTheta3;;
-        theta4Offset = imuTheta4;
+        theta2Offset = currLimb == RIGHT ? imuTheta2 : -imuTheta2;
+        theta3Offset = currLimb == RIGHT ? imuTheta3 : -imuTheta3;
+        theta4Offset = currLimb == RIGHT ? imuTheta4 : -imuTheta4;
         // Reset encoder counts.
         angle1.write(0);
         angle2.write(0);
@@ -120,7 +120,7 @@ void readHandleIncomingMessage() {
         theta1Prev = theta1; // This to avoid triggering ANG1JUMPERR 
         theta2 = limbAngleScale * theta2Offset;
         theta3 = limbAngleScale * theta3Offset;
-        theta4 = limbAngleScale * (-theta4Offset);
+        theta4 = - limbAngleScale * theta4Offset;
         calib = YESCALIB;
         _cmdSet = 0x01;
         break;
@@ -209,13 +209,13 @@ void writeSensorStream()
     bt.write(packetNumber.bytes[i]);
     chksum += packetNumber.bytes[i];
   }
-
+  
   // Send current run time
   for (int i = 0; i < 4; i++) {
     bt.write(runTime.bytes[i]);
     chksum += runTime.bytes[i];
   }
-
+  
   // Send the floats
   for (int i = 0; i < outPayload.sz() * 4; i++) {
     _temp = outPayload.getByte(i);

@@ -56,7 +56,7 @@ void updateSensorData() {
   theta1 = limbAngleScale * (read_angle1() + theta1Offset);
   theta2 = limbAngleScale * (read_angle2() + theta2Offset);
   theta3 = limbAngleScale * (read_angle3() + theta3Offset);
-  theta4 = limbAngleScale * (read_angle4() - theta4Offset);
+  theta4 = - limbAngleScale * (read_angle4() - theta4Offset);
   
   // 2a. Update actual angle buffer
   actual.add(theta1);
@@ -71,7 +71,7 @@ void updateSensorData() {
   if(ctrlType != POSITION)updateImu();
 
   // Check for angle errors only after calibration has been done.
-  // checkEncoder1LimitMismatch();
+  checkEncoder1LimitMismatch();
   checkEncoder234LimitMismatch();
   // checkEncoderIMUMismatch();
   checkEncoderJump();

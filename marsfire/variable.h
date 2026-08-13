@@ -49,7 +49,7 @@
 #define LOADCELL1_SCK_PIN         15//16
 #define LOADCELL2_DOUT_PIN        16//17
 #define LOADCELL2_SCK_PIN         17//18
-#define LOACELL_CALIB_FACTOR      12866.6
+#define LOACELL_CALIB_FACTOR      58.58//11-58.58//12-59.30//13-65.46//14-59.65//15-62.34d-12866.6
 #define ARM_REST_WEIGHT           1.46    // New
 
 // Limb type
@@ -172,7 +172,7 @@
 #define SIGN(x)                   x >= 0 ? 1 : -1
 
 // Version and device ID.
-const char* fwVersion = "h1.0.2";
+const char* fwVersion = "AB-FW-1.1";
 const char* deviceId  = "MARS-HOMER";
 const char* compileDate = __DATE__ " " __TIME__;
 
@@ -261,6 +261,10 @@ MPU6050 mpu(Wire);
 MPU6050 mpu2(Wire1);
 MPU6050 mpu3(Wire1);
 float imuTheta1, imuTheta2, imuTheta3, imuTheta4;
+// Raw accelerometer readings from each MPU6050 (stored each IMU update tick)
+float imuRawAX1, imuRawAY1, imuRawAZ1;  // MPU6050 #1
+float imuRawAX2, imuRawAY2, imuRawAZ2;  // MPU6050 #2
+float imuRawAX3, imuRawAY3, imuRawAZ3;  // MPU6050 #3
 
 // Endpoint kinematics of the robot.
 float xEp, yEp, zEp;

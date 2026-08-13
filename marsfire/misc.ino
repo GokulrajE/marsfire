@@ -183,22 +183,25 @@ void imuSetup() {
 }
 
 void updateImu() {
-  float ax1, ay1, az1, ax2, ay2, az2, ax3, ay3, az3;
-
+  
   mpu.update();
   mpu2.update();
   mpu3.update();
 
-  // Read IMUs
-  ax1 = mpu.getAccX();
-  ay1 = mpu.getAccY();
-  az1 = mpu.getAccZ();
-  ax2 = mpu2.getAccX();
-  ay2 = mpu2.getAccY();
-  az2 = mpu2.getAccZ();
-  ax3 = mpu3.getAccX();
-  ay3 = mpu3.getAccY();
-  az3 = mpu3.getAccZ();
+  // Read and store raw accelerometer values into globals so they can be streamed
+  imuRawAX1 = mpu.getAccX();
+  imuRawAY1 = mpu.getAccY();
+  imuRawAZ1 = mpu.getAccZ();
+  imuRawAX2 = mpu2.getAccX();
+  imuRawAY2 = mpu2.getAccY();
+  imuRawAZ2 = mpu2.getAccZ();
+  imuRawAX3 = mpu3.getAccX();
+  imuRawAY3 = mpu3.getAccY();
+  imuRawAZ3 = mpu3.getAccZ();
+
+  float ax1 = imuRawAX1, ay1 = imuRawAY1, az1 = imuRawAZ1;
+  float ax2 = imuRawAX2, ay2 = imuRawAY2, az2 = imuRawAZ2;
+  float ax3 = imuRawAX3, ay3 = imuRawAY3, az3 = imuRawAZ3;
   #ifdef IMU_DEBUG
     SerialUSB.print(currLimb);
     SerialUSB.print(" | ");
